@@ -1,0 +1,9 @@
+/vendor/
+/.settings/
+/.buildpath
+/.project
+/composer.lock
+/.history
+/.vscode
+.idea
+/.cursor
