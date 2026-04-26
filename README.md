@@ -40,7 +40,7 @@
 | [Flavors / multi-app](docs/flavors-multi-app.md) | Env + flavor - app pattern, not core UFW. |
 | [Security](docs/security.md) · [SECURITY.md](SECURITY.md) | Deployment checklist and vulnerability reporting. |
 | [Contributing](CONTRIBUTING.md) | PR style, scope rules, local checks. |
-| [Changelog](CHANGELOG.md) | Stub until 1.0; use `git log` and `composer.lock` until then. |
+| [Changelog](CHANGELOG.md) | Full history of releases and changes. |
 | [License](LICENSE) | 0BSD |
 
 ## Install
