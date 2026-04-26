@@ -9,7 +9,23 @@
         }
     },
     "name": "ctebah/ufw",
+    "description": "A compact, highly extensible PHP framework for building robust backend services, platforms, and web portals.",
+    "homepage": "https://github.com/ctebah/ufw",
     "license": "0BSD",
+    "keywords": [
+        "framework",
+        "micro-framework",
+        "backend",
+        "middleware",
+        "mvc",
+        "extensible",
+        "routing",
+        "forms",
+        "validation",
+        "mysql",
+        "api",
+        "assets"
+    ],
     "authors": [
         {
             "name": "ctebah",
