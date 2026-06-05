@@ -129,8 +129,6 @@ class JsOut
      * 2. Replace every opening or closing script tag ({@code <script …>}, {@code </script>}) with {@code ;}. This is a
      *    best-effort unwrap for server-assembled fragments; it is not safe if the JS source itself contains those
      *    sequences inside a string literal, or if you embed {@code <script src="…">} (those tags would be stripped).
-     * 3. Collapse runs of two or more semicolons (with only whitespace between) into a single {@code ;} followed by
-     *    a newline.
      */
     protected function _sanitize()
     {
@@ -138,12 +136,10 @@ class JsOut
             '~^\s+~m',
             '~\s+$~m',
             '~</?script\b[^>]*>~i',
-            '~;(?:\s*;)+~',
         ), array(
             '',
             '',
             ';',
-            ";\n",
         ), $this->jsContent);
         if ($this->doConcatenate) {
             $wrapped = $this->jsContent['ready'] !== '' && $this->jsContent['ready'] !== null
