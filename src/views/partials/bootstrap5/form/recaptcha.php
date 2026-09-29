@@ -18,16 +18,40 @@
 <?php $this->placeholder('jsInline')->captureStart(); ?>
 <script>
 (function() {
+    var inputId = '<?php echo $element->getId(); ?>';
+    var $input = $('#' + inputId);
+    var $visual = $('#' + inputId + '-visual');
+    var $form = $input.closest('form');
+
+    var omitGoogleRecaptchaField = function() {
+        $visual.find('textarea[name="g-recaptcha-response"]').prop('disabled', true);
+        if ($form.length) {
+            $form.find('textarea[name="g-recaptcha-response"]').prop('disabled', true);
+        }
+    };
+
     var recaptchaCallback = function(response) {
-        $('#<?php echo $element->getId(); ?>').val(response);
+        $input.val(response);
+        omitGoogleRecaptchaField();
+    };
+
+    var recaptchaExpiredCallback = function() {
+        $input.val('');
+        $visual.find('textarea[name="g-recaptcha-response"]').prop('disabled', false);
+    };
+
+    if ($form.length) {
+        $form.on('submit', omitGoogleRecaptchaField);
     }
+
     $(document).one('grecaptcha.loaded', function() {
-        grecaptcha.render('<?php echo $element->getId(); ?>-visual', {
+        grecaptcha.render(inputId + '-visual', {
             sitekey: '<?php echo $element->getOption('site_key'); ?>',
             size: 'normal',
             tabindex: 0,
-            callback: recaptchaCallback
-        })
+            callback: recaptchaCallback,
+            'expired-callback': recaptchaExpiredCallback
+        });
     });
     if (typeof grecaptcha == 'object') {
         $(document).trigger('grecaptcha.loaded');
