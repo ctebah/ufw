@@ -2,6 +2,8 @@
 
 **μfw** is short for micro framework - that is the real name; UFW is the ASCII spelling so nobody has to chase `μ` on the keyboard. A compact PHP stack for people who still like PHP, and for people who must use it even if they do not love it.
 
+**AI-assisted development:** intent-first guides, [AGENTS.md](AGENTS.md), and working demos in [ufw-extras](https://github.com/ctebah/ufw-extras) — see the [Evaluation FAQ on coding assistants](docs/evaluation-faq.md#does-the-codebase-work-well-with-ai-coding-assistants-cursor-claude-copilot-).
+
 ---
 
 **Probably not for you if:**
