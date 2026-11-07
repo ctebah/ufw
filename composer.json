@@ -2,7 +2,9 @@
     "autoload": {
         "files": [
             "src/functions/array_get_and_unset.php",
-            "src/functions/mydie.php"
+            "src/functions/mydie.php",
+            "src/functions/preg_grep_keys.php",
+            "src/functions/filter_string_keyed_array.php"
         ],
         "psr-4": {
             "Ufw\\": "src"
@@ -12,26 +14,9 @@
     "description": "A compact, highly extensible PHP framework for building robust backend services, platforms, and web portals.",
     "homepage": "https://github.com/ctebah/ufw",
     "license": "0BSD",
-    "keywords": [
-        "framework",
-        "micro-framework",
-        "backend",
-        "middleware",
-        "mvc",
-        "extensible",
-        "routing",
-        "forms",
-        "validation",
-        "mysql",
-        "api",
-        "assets"
-    ],
-    "authors": [
-        {
-            "name": "ctebah",
-            "role": "Original author"
-        }
-    ],
+    "config": {
+        "process-timeout": 1200
+    },
     "require": {
         "php": ">=7.4",
         "guzzlehttp/guzzle": "^7.",
@@ -43,5 +28,28 @@
         "laminas/laminas-httphandlerrunner": "^2",
         "willdurand/negotiation": "^3",
         "tedivm/jshrink": "^1.8"
+    },
+    "suggest": {
+        "solarium/solarium": "For Ufw\\Model\\Record\\Solr — install in the application when using Solr-backed records (e.g. ^6)."
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5",
+        "phpstan/phpstan": "^2.1"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Ufw\\Tests\\": "tests/",
+            "Ufw\\Form\\Validator\\": "tests/Support/Fixtures/Validator/",
+            "Ufw\\Form\\Filter\\": "tests/Support/Fixtures/Filter/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --testsuite unit",
+        "test-component": "phpunit --testsuite component",
+        "test-all": "@php bin/docker-phpunit.php vendor/bin/phpunit -c phpunit.xml.dist --coverage-html coverage/html --coverage-text=coverage/summary.txt --coverage-clover coverage/clover.xml",
+        "test-all-html": "@php bin/docker-phpunit.php vendor/bin/phpunit -c phpunit.xml.dist --coverage-html coverage/html --coverage-text=coverage/summary.txt --coverage-clover coverage/clover.xml",
+        "coverage-check": "@php bin/coverage-check.php --min-lines=98 --min-methods=98",
+        "coverage-gaps": "@php bin/coverage-gaps.php",
+        "phpstan": "phpstan analyse --memory-limit=512M"
     }
 }

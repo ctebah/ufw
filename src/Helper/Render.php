@@ -8,21 +8,40 @@ namespace Ufw\Helper;
  */
 class Render extends ViewRendererBase
 {
+    /**
+     * @var \Negotiation\Negotiator|null
+     */
     protected $negotiator = null;
 
+    /**
+     * @var bool
+     */
     protected $overwrite = true;
 
+    /**
+     * @param array<string, mixed> $vars
+     * @param string|null $script
+     * @param bool $controllerDir
+     * @return $this
+     */
     public function __invoke($vars = array(), $script = null, $controllerDir = true)
     {
         return $this->render($vars, $script, $controllerDir);
     }
 
+    /**
+     * @param array<string, mixed> $vars
+     * @param string|null $script
+     * @param bool $controllerDir
+     * @return $this
+     */
     public function render($vars = array(), $script = null, $controllerDir = true)
     {
         if ($this->getResponse()->shouldRenderViewScript()) {
             $html = $this->renderHtml($vars, $script, $controllerDir);
-            $this->getResponse()->setContent($this->getOverwrite() ? $html : $this->getResponse()
-                ->getContent() . $html);
+            $existing = $this->getResponse()->getContent();
+            $existingHtml = is_string($existing) ? $existing : '';
+            $this->getResponse()->setContent($this->getOverwrite() ? $html : $existingHtml . $html);
         } else {
             $this->getResponse()->setContent($this->getOverwrite() ? $vars : array_merge((array) $this->getResponse()
                 ->getContent(), $vars));
@@ -30,14 +49,19 @@ class Render extends ViewRendererBase
         return $this;
     }
 
+    /**
+     * @param array<string, mixed> $vars
+     * @param string|null $script
+     * @param bool $controllerDir
+     * @return string
+     */
     public function renderScript($vars = array(), $script = null, $controllerDir = true)
     {
         return $this->renderHtml($vars, $script, $controllerDir);
     }
 
     /**
-     *
-     * @return \Negotiation\Negotiator;
+     * @return \Negotiation\Negotiator
      */
     public function getNegotiator()
     {
@@ -48,8 +72,7 @@ class Render extends ViewRendererBase
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function getOverwrite()
     {
@@ -57,8 +80,8 @@ class Render extends ViewRendererBase
     }
 
     /**
-     *
-     * @param boolean $overwrite
+     * @param bool $overwrite
+     * @return $this
      */
     public function setOverwrite($overwrite)
     {

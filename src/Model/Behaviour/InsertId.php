@@ -6,6 +6,12 @@ namespace Ufw\Model\Behaviour;
  */
 class InsertId extends Base
 {
+    public $order = 100;
+    /**
+     * @param mixed $success
+     * @param array<string, mixed> $opts
+     * @return $this
+     */
     public function afterInsert($success, $opts = [])
     {
         if (!$success || !$this->getOwner()->getIsNewRecord()) {

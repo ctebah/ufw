@@ -9,11 +9,19 @@ namespace Ufw\Helper;
 class Redirect extends Base
 {
 
+    /**
+     * @param string $url
+     * @return void
+     */
     public function __invoke($url)
     {
         $this->redirect($url);
     }
 
+    /**
+     * @param string $url
+     * @return void
+     */
     public function redirect($url)
     {
         $this->getResponse()->withHeader('Location', $url)->setFormat('raw');

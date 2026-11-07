@@ -12,6 +12,9 @@ use RuntimeException;
 class UploadedTmpFile extends \Laminas\Diactoros\UploadedFile
 {
 
+    /**
+     * @var bool
+     */
     protected $deleteOnMove = true;
 
     /**
@@ -19,12 +22,6 @@ class UploadedTmpFile extends \Laminas\Diactoros\UploadedFile
      * @var bool
      */
     protected $moved = false;
-
-    /**
-     *
-     * @var null|string
-     */
-    protected $file;
 
     /**
      *
@@ -46,10 +43,13 @@ class UploadedTmpFile extends \Laminas\Diactoros\UploadedFile
         }
 
         if ($this->getError() !== UPLOAD_ERR_OK) {
-            throw new RuntimeException(sprintf('Cannot retrieve stream due to upload error: %s', self::ERROR_MESSAGES[$this->getError()]));
+            $code = $this->getError();
+            $messages = self::ERROR_MESSAGES;
+            $label = isset($messages[$code]) ? $messages[$code] : 'Unknown upload error';
+            throw new RuntimeException(sprintf('Cannot retrieve stream due to upload error: %s', $label));
         }
 
-        if (!is_string($targetPath) || empty($targetPath)) {
+        if ($targetPath === '') {
             throw new InvalidArgumentException('Invalid path provided for move operation; must be a non-empty string');
         }
 
@@ -58,27 +58,98 @@ class UploadedTmpFile extends \Laminas\Diactoros\UploadedFile
             throw new RuntimeException(sprintf('The target directory `%s` does not exists or is not writable', $targetDirectory));
         }
 
-        $sapi = PHP_SAPI;
-        switch (true) {
-            case (empty($sapi) || 0 === strpos($sapi, 'cli') || !$this->file):
-                // Non-SAPI environment, or no filename present
-                $this->writeFile($targetPath);
-                break;
-            default:
-                // SAPI environment, with file present
-                if ($this->getDeleteOnMove()) {
-                    if (false === rename($this->file, $targetPath)) {
-                        throw new RuntimeException('Error occurred while moving uploaded file');
-                    }
-                } else {
-                    if (false === copy($this->file, $targetPath)) {
-                        throw new RuntimeException('Error occurred while moving uploaded file');
-                    }
+        $sourcePath = $this->resolveSourceFilePath();
+        if ($this->shouldWriteStreamToTarget($sourcePath)) {
+            $this->writeFile($targetPath);
+        } else {
+            if ($sourcePath === null || $sourcePath === '' || !is_file($sourcePath)) {
+                throw new RuntimeException('Cannot move file; uploaded source path is missing');
+            }
+            if ($this->getDeleteOnMove()) {
+                if (false === $this->renameUploadedPath($sourcePath, $targetPath)) {
+                    throw new RuntimeException('Error occurred while moving uploaded file');
                 }
-                break;
+            } else {
+                if (false === $this->copyUploadedPath($sourcePath, $targetPath)) {
+                    throw new RuntimeException('Error occurred while moving uploaded file');
+                }
+            }
         }
 
         $this->moved = true;
+    }
+
+    /**
+     * @param string $sourcePath
+     * @param string $targetPath
+     * @return bool
+     */
+    protected function renameUploadedPath($sourcePath, $targetPath)
+    {
+        return rename($sourcePath, $targetPath);
+    }
+
+    /**
+     * @param string $sourcePath
+     * @param string $targetPath
+     * @return bool
+     */
+    protected function copyUploadedPath($sourcePath, $targetPath)
+    {
+        return copy($sourcePath, $targetPath);
+    }
+
+    /**
+     * CLI and missing on-disk source use stream copy; SAPI + path uses rename/copy.
+     *
+     * @param string|null $sourcePath
+     * @return bool
+     */
+    protected function shouldWriteStreamToTarget($sourcePath)
+    {
+        if ($this->usesCliStreamWrite()) {
+            return true;
+        }
+
+        return $sourcePath === null || $sourcePath === '';
+    }
+
+    /**
+     * Whether the current SAPI should always stream-copy uploads (PHPUnit/CLI).
+     *
+     * @return bool
+     */
+    protected function usesCliStreamWrite()
+    {
+        return strncmp(PHP_SAPI, 'cli', 3) === 0;
+    }
+
+    /**
+     * On-disk temp path from Laminas parent (private `file` property).
+     *
+     * @return string|null
+     */
+    private function resolveSourceFilePath()
+    {
+        $ref = new \ReflectionClass(\Laminas\Diactoros\UploadedFile::class);
+        if (!$this->diactorosUploadedFileDefinesDiskPathProperty($ref)) {
+            return null;
+        }
+        $prop = $ref->getProperty('file');
+        $prop->setAccessible(true);
+        $value = $prop->getValue($this);
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Whether Laminas {@see \Laminas\Diactoros\UploadedFile} exposes the on-disk `file` property (override in tests for legacy layouts).
+     *
+     * @param \ReflectionClass<\Laminas\Diactoros\UploadedFile> $uploadedFileReflection
+     */
+    protected function diactorosUploadedFileDefinesDiskPathProperty(\ReflectionClass $uploadedFileReflection): bool
+    {
+        return $uploadedFileReflection->hasProperty('file');
     }
 
     /**
@@ -88,7 +159,7 @@ class UploadedTmpFile extends \Laminas\Diactoros\UploadedFile
      */
     private function writeFile($path): void
     {
-        $handle = fopen($path, 'wb+');
+        $handle = @fopen($path, 'wb+');
         if (false === $handle) {
             throw new RuntimeException('Unable to write to designated path');
         }
@@ -102,11 +173,18 @@ class UploadedTmpFile extends \Laminas\Diactoros\UploadedFile
         fclose($handle);
     }
 
+    /**
+     * @return bool
+     */
     public function getDeleteOnMove()
     {
         return $this->deleteOnMove;
     }
 
+    /**
+     * @param bool $deleteOnMove
+     * @return $this
+     */
     public function setDeleteOnMove($deleteOnMove)
     {
         $this->deleteOnMove = $deleteOnMove;

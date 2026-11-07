@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS widget;
+CREATE TABLE widget (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(100) NULL,
+  qty INT NULL,
+  data TEXT NULL,
+  version INT NOT NULL DEFAULT 1,
+  ts_updated DATETIME NULL,
+  code VARCHAR(50) NULL,
+  label VARCHAR(40) NOT NULL DEFAULT 'from-db',
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_widget_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

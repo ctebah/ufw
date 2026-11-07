@@ -4,11 +4,21 @@ namespace Ufw\Form\Element;
 
 /**
  * Abstract form field: HTML attributes/options, filters, validators, value lifecycle, and rendering through the form helper’s {@see \Ufw\Helper\FormRenderHelperBase::field()}.
+ *
+ * @method string|null getLabel()
+ * @method string|null getLabelClass()
+ * @method string|null getDescription()
+ * @method string|null getIcon()
+ * @method string|null getWrapClass()
+ * @method string|null getCaption()
  */
 abstract class Base
 {
     use \Ufw\Form\Attribs, \Ufw\Form\Options, \Ufw\Form\Filters, \Ufw\Form\Validators, \Ufw\Form\Translate;
 
+    /**
+     * @var list<string>
+     */
     protected $defaultOptionsToAttribs = [
         'name',
         'id',
@@ -27,16 +37,24 @@ abstract class Base
     ];
 
     /**
-     *
-     * @var string
+     * @var mixed
      */
     protected $value = null;
 
+    /**
+     * @var mixed
+     */
     protected $valueUnfiltered = null;
 
+    /**
+     * @var string|null
+     */
     protected $type = 'text';
 
-    protected $errors;
+    /**
+     * @var list<string>
+     */
+    protected $errors = [];
 
     /**
      * Ignore flag (used when retrieving values at form level)
@@ -46,26 +64,46 @@ abstract class Base
     protected $ignore = false;
 
     /**
-     *
-     * @var \Ufw\Form\Base
+     * @var \Ufw\Form\Base|null
      */
     protected $form = null;
 
+    /**
+     * @var string
+     */
     protected $labelPlacement = 'above';
 
     /**
      * bootstrap3 / bootstrap4 / bootstrap5 (or any other) helper would use this value to render element itself
      *
-     * @var string
+     * @var string|null
      */
     protected $renderScript = null;
 
+    /**
+     * @var string|null
+     */
     protected $renderScriptPath = null;
 
+    /**
+     * @var string|null
+     */
     protected static $renderHelperName = null;
 
+    /**
+     * @var bool
+     */
     protected $allowMultiple = false;
 
+    /**
+     * @var bool
+     */
+    protected $autoArray = false;
+
+    /**
+     * @param string $name
+     * @param array<string, mixed>|null $options
+     */
     public function __construct($name, array $options = null)
     {
         $this->setOptionsToAttribs($this->defaultOptionsToAttribs);
@@ -78,6 +116,9 @@ abstract class Base
         $this->postInit();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getDefaultOptions()
     {
         return [
@@ -88,10 +129,15 @@ abstract class Base
         ];
     }
 
+    /**
+     * @return $this
+     */
     protected function preInit()
     {
         if (null === $this->getAttrib('id')) {
-            $id = trim(strtolower(preg_replace(array(
+            $name = $this->getAttrib('name');
+            $nameStr = is_string($name) ? $name : '';
+            $id = trim(strtolower((string) preg_replace(array(
                 '~([A-Z][^A-Z])~',
                 '~[\-_\[\]]{1,}~',
                 '~\-+~'
@@ -99,35 +145,50 @@ abstract class Base
                 '-$1',
                 '-',
                 '-'
-            ), $this->getAttrib('name'))), '-');
+            ), $nameStr)), '-');
             $this->setAttrib('id', $id . '-form-element');
         }
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     public function init()
     {
         return $this;
     }
 
+    /**
+     * Optional client-side metadata (see form `_metadata.php` partials).
+     *
+     * @return mixed
+     */
+    public function getMetadata()
+    {
+        return $this->getOption('metadata');
+    }
+
+    /**
+     * @return $this
+     */
     protected function postInit()
     {
         return $this;
     }
 
+    /**
+     * @param string $name
+     * @return mixed
+     */
     public function __get($name)
     {
-        if (method_exists($this, 'get' . ucfirst($name))) {
-            return call_user_func(array(
-                $this,
-                'get' . ucfirst($name)
-            ));
+        $getter = 'get' . ucfirst($name);
+        if (method_exists($this, $getter)) {
+            return $this->$getter();
         }
         if ($this->hasOption($name)) {
             return $this->getOption($name);
-        }
-        if ($this->hasElement($name)) {
-            return $this->getElement($name);
         }
         if ($this->hasAttrib($name)) {
             return $this->getAttrib($name);
@@ -135,21 +196,31 @@ abstract class Base
         return null;
     }
 
-    public function __set($name, $value)
+    /**
+     * @param string $name
+     * @param mixed $value
+     */
+    public function __set($name, $value): void
     {
-        if (method_exists($this, 'set' . ucfirst($name))) {
-            return call_user_func(array(
-                $this,
-                'set' . ucfirst($name)
-            ), $value);
+        $setter = 'set' . ucfirst($name);
+        if (method_exists($this, $setter)) {
+            $this->$setter($value);
         }
     }
 
+    /**
+     * @param string $name
+     */
     public function __isset($name): bool
     {
         return $this->hasOption($name) || $this->hasAttrib($name);
     }
 
+    /**
+     * @param string $method
+     * @param array<int, mixed> $args
+     * @return mixed
+     */
     public function __call($method, $args)
     {
         if (substr($method, 0, 3) == 'get') {
@@ -157,21 +228,51 @@ abstract class Base
             return $this->$prop;
         }
 
+        if (substr($method, 0, 3) === 'set' && array_key_exists(0, $args)) {
+            $prop = lcfirst(substr($method, 3));
+
+            return $this->setOption($prop, $args[0]);
+        }
+
         return null;
     }
 
     public function __toString()
     {
-        return $this->getHelper($this->getRenderHelperName())
-            ->field($this);
+        $helper = $this->resolveFormRenderHelper();
+        return $helper->field($this);
     }
 
+    /**
+     * @return \Ufw\Helper\FormRenderHelperBase
+     */
+    protected function resolveFormRenderHelper()
+    {
+        $helper = $this->getHelper($this->getRenderHelperName());
+        if (!$helper instanceof \Ufw\Helper\FormRenderHelperBase) {
+            throw new \RuntimeException(sprintf(
+                'Form render helper %s is not available.',
+                $this->getRenderHelperName()
+            ));
+        }
+        return $helper;
+    }
+
+    /**
+     * @param string $message
+     * @return $this
+     */
     public function addError($message)
     {
-        $this->errors[] = $this->translate($message);
+        $translated = $this->translate($message);
+        $this->errors[] = is_string($translated) ? $translated : $message;
         return $this;
     }
 
+    /**
+     * @param array<int|string, string> $messages
+     * @return $this
+     */
     public function addErrors($messages)
     {
         foreach ($messages as $message) {
@@ -180,15 +281,36 @@ abstract class Base
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     public function clearErrors()
     {
         $this->errors = [];
         return $this;
     }
 
+    /**
+     * @return list<string>
+     */
+    public function getErrors()
+    {
+        return $this->errors;
+    }
+
+    /**
+     * @param array<string, mixed>|null $context
+     * @return bool
+     */
     public function isValid($context = null)
     {
         $value = $this->getValue();
+        if ($this->getAllowMultiple()) {
+            $unfiltered = $this->getValueUnfiltered();
+            if (is_array($unfiltered)) {
+                $value = $unfiltered;
+            }
+        }
         $this->clearErrors();
         if ($this->isRequired()) {
             $this->addValidator('required', [
@@ -200,6 +322,9 @@ abstract class Base
         $result = true;
         foreach ($this->getValidatorNames() as $validatorKey) {
             $validator = $this->getValidator($validatorKey);
+            if ($validator === null) {
+                continue;
+            }
             if (!$validator->isValid($value, $context)) {
                 $result = false;
                 $this->addErrors($validator->getErrors());
@@ -209,37 +334,66 @@ abstract class Base
         return $result;
     }
 
+    /**
+     * @param string $name
+     * @return \Ufw\Helper\Base|null
+     */
     public function getHelper($name)
     {
-        return \Ufw\Registry::getInstance()->get('application')->getHelper($name);
+        $application = \Ufw\Registry::getInstance()->get('application');
+        if (!$application instanceof \Ufw\Application) {
+            return null;
+        }
+
+        return $application->getHelper($name);
     }
 
+    /**
+     * @return bool
+     */
     public function isRequired()
     {
         return !!$this->getAttrib('required');
     }
 
+    /**
+     * @param string $className
+     * @return $this
+     */
     public function addClass($className)
     {
         $cls = $this->getAttrib('class');
-        if (!$cls || !preg_match('~(^|\s)' . preg_quote($className, '~') . '($|\s)~', $cls)) {
-            $this->setAttrib('class', "$cls $className");
+        $clsStr = is_string($cls) ? $cls : '';
+        if (!$clsStr || !preg_match('~(^|\s)' . preg_quote($className, '~') . '($|\s)~', $clsStr)) {
+            $this->setAttrib('class', trim("$clsStr $className"));
         }
         return $this;
     }
 
+    /**
+     * @param string $className
+     * @return $this
+     */
     public function removeClass($className)
     {
         $cls = $this->getAttrib('class');
-        $this->setAttrib('class', preg_replace('~(^|\s)' . preg_quote($className, '~') . '($|\s)~', '$1$2', $cls));
+        $clsStr = is_string($cls) ? $cls : '';
+        $this->setAttrib('class', preg_replace('~(^|\s)' . preg_quote($className, '~') . '($|\s)~', '$1$2', $clsStr));
         return $this;
     }
 
+    /**
+     * @return string|null
+     */
     public function getType()
     {
         return $this->type;
     }
 
+    /**
+     * @param string $type
+     * @return $this
+     */
     public function setType($type)
     {
         $this->type = $type;
@@ -247,26 +401,60 @@ abstract class Base
     }
 
     /**
-     *
-     * @return string|array
+     * @return mixed
      */
     public function getValue()
     {
         return $this->value;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getAttribs()
     {
         $attribs = $this->attribs()->getAll();
-        if ($this->getAllowMultiple() && isset($attribs['name']) && $attribs['name'] && !preg_match('~\[\]$~', $attribs['name'])) {
+        if ($this->getAllowMultiple()
+            && isset($attribs['name'])
+            && is_string($attribs['name'])
+            && $attribs['name'] !== ''
+            && !preg_match('~\[\]$~', $attribs['name'])
+        ) {
             $attribs['name'] = $attribs['name'] . '[]';
         }
         return $attribs;
     }
 
     /**
-     *
-     * @param string $value
+     * @return list<string>
+     */
+    protected function getMultiOptionValues()
+    {
+        return [];
+    }
+
+    /**
+     * @return string
+     */
+    public function getName()
+    {
+        $name = $this->getAttrib('name');
+        return is_string($name) ? $name : '';
+    }
+
+    /**
+     * @return string
+     */
+    public function getId()
+    {
+        $id = $this->getAttrib('id');
+        return is_string($id) ? $id : '';
+    }
+
+    /**
+     * @param mixed $value
+     * @param array<string, mixed>|null $context
+     * @return $this
      */
     public function setValue($value, $context = null)
     {
@@ -274,22 +462,33 @@ abstract class Base
         if ($this->getFilters()) {
             foreach ($this->getFilterNames() as $filterKey) {
                 $filter = $this->getFilter($filterKey);
+                if ($filter === null) {
+                    continue;
+                }
                 $value = $filter->filter($value);
             }
         }
         $this->value = $value;
 
         if ($this->getAllowMultiple()) {
-            if ($this->getMultiOptionValues()) {
+            $multiValues = $this->getMultiOptionValues();
+            if ($multiValues) {
                 if (is_array($this->value)) {
-                    $this->value = array_intersect($this->value, $this->getMultiOptionValues());
+                    $filtered = array();
+                    foreach ($this->value as $selected) {
+                        if (in_array($selected, $multiValues)) {
+                            $filtered[] = $selected;
+                        }
+                    }
+                    $this->value = $filtered;
                 } else {
-                    $this->value = in_array($this->value, $this->getMultiOptionValues()) ? $this->value : null;
+                    $this->value = in_array($this->value, $multiValues) ? $this->value : null;
                 }
             }
         }
 
-        if ((is_array($this->getValueUnfiltered()) && $this->getValueUnfiltered()) || (is_scalar($this->getValueUnfiltered()) && strlen($this->getValueUnfiltered()))) {
+        $unfiltered = $this->getValueUnfiltered();
+        if ((is_array($unfiltered) && $unfiltered) || (is_scalar($unfiltered) && strlen((string) $unfiltered))) {
             $this->addClass('has-content');
         }
 
@@ -297,8 +496,7 @@ abstract class Base
     }
 
     /**
-     *
-     * @return \Ufw\Form\Base
+     * @return \Ufw\Form\Base|null
      */
     public function getForm()
     {
@@ -306,8 +504,8 @@ abstract class Base
     }
 
     /**
-     *
-     * @param \Ufw\Form\Base $form
+     * @param \Ufw\Form\Base|null $form
+     * @return $this
      */
     public function setForm(\Ufw\Form\Base $form = null)
     {
@@ -316,7 +514,6 @@ abstract class Base
     }
 
     /**
-     *
      * @return bool
      */
     public function getIgnore()
@@ -325,8 +522,8 @@ abstract class Base
     }
 
     /**
-     *
      * @param bool $ignore
+     * @return $this
      */
     public function setIgnore($ignore)
     {
@@ -335,7 +532,6 @@ abstract class Base
     }
 
     /**
-     *
      * @return string
      */
     public function getLabelPlacement()
@@ -344,8 +540,8 @@ abstract class Base
     }
 
     /**
-     *
      * @param string $labelPlacement
+     * @return $this
      */
     public function setLabelPlacement($labelPlacement)
     {
@@ -354,7 +550,6 @@ abstract class Base
     }
 
     /**
-     *
      * @return string
      */
     public function getRenderScript()
@@ -363,8 +558,8 @@ abstract class Base
     }
 
     /**
-     *
      * @param string $renderScript
+     * @return $this
      */
     public function setRenderScript($renderScript)
     {
@@ -373,8 +568,7 @@ abstract class Base
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function getAllowMultiple()
     {
@@ -382,8 +576,8 @@ abstract class Base
     }
 
     /**
-     *
-     * @param boolean $allowMultiple
+     * @param bool $allowMultiple
+     * @return $this
      */
     public function setAllowMultiple($allowMultiple)
     {
@@ -393,8 +587,7 @@ abstract class Base
     }
 
     /**
-     *
-     * @return string
+     * @return mixed
      */
     public function getValueUnfiltered()
     {
@@ -402,8 +595,8 @@ abstract class Base
     }
 
     /**
-     *
-     * @param string $valueUnfiltered
+     * @param mixed $valueUnfiltered
+     * @return $this
      */
     public function setValueUnfiltered($valueUnfiltered)
     {
@@ -412,24 +605,33 @@ abstract class Base
     }
 
     /**
-     *
      * @return string
      */
     public function getRenderHelperName()
     {
         if (!static::$renderHelperName) {
-            $helperName = @\Ufw\Registry::getInstance()->get('application')->getConfig()['form']['helper'];
-            if (!$helperName) {
-                $helperName = 'bootstrap3';
+            $application = \Ufw\Registry::getInstance()->get('application');
+            $helperName = 'bootstrap3';
+            if ($application instanceof \Ufw\Application) {
+                $config = $application->getConfig();
+                if (is_array($config) && isset($config['form']) && is_array($config['form'])) {
+                    $formConfig = $config['form'];
+                    if (isset($formConfig['helper'])
+                        && is_string($formConfig['helper'])
+                        && $formConfig['helper'] !== ''
+                    ) {
+                        $helperName = $formConfig['helper'];
+                    }
+                }
             }
             self::setRenderHelperName($helperName);
         }
-        return static::$renderHelperName;
+        return (string) static::$renderHelperName;
     }
 
     /**
-     *
      * @param string $renderHelperName
+     * @return void
      */
     public static function setRenderHelperName($renderHelperName)
     {

@@ -9,7 +9,8 @@
 
     $errors = $element->getErrors();
     $hasErrors = !!$errors;
-    $hasSuccess = @strlen($element->getValue()) && !$hasErrors && $element->getForm()->getValidated();
+    $elementValue = $element->getValue();
+    $hasSuccess = is_string($elementValue) && $elementValue !== '' && !$hasErrors && ($form = $element->getForm()) !== null && $form->getValidated();
     $ord = 1;
 ?>
 <div class="form-group <?php echo $element->getWrapClass() . ' ', $element->isRequired() ? 'required ' : '', $hasErrors ? 'has-error ' : '', $hasErrors || $hasSuccess ? 'has-feedback ' : ''; ?>">
@@ -19,9 +20,9 @@
     
     <?php foreach ($element->getMultiOptions() as $optKey => $optValue): ?>
         <div class="radio">
-            <?php echo $this->html5Tag()->void('input', ['value' => $optKey, 'id' => $element->getId() . '-' . $ord, 'checked' => !strcmp($element->getValue(), $optKey)] + $element->getAttribs()); ?>
+            <?php echo $this->html5Tag()->void('input', ['value' => $optKey, 'id' => $element->getId() . '-' . $ord, 'checked' => is_string($elementValue = $element->getValue()) && $elementValue == $optKey] + $element->getAttribs()); ?>
             <label for="<?php echo $element->getId() . '-' . $ord++; ?>">
-                <?php echo htmlspecialchars($optValue, ENT_QUOTES | ENT_HTML5); ?>
+                <?php echo htmlspecialchars(is_string($optValue) ? $optValue : '', ENT_QUOTES | ENT_HTML5); ?>
                 <i class="material-icons checked">&#xE837;</i>
                 <i class="material-icons unchecked">&#xE836;</i>
             </label>

@@ -35,12 +35,18 @@ Handling in `run()`:
 
 | Status range | Behaviour |
 |--------------|-----------|
-| 300–310 (redirects) | Response is emitted as-is, script dies. No error action. |
-| 401 with `WWW-Authenticate` header already set | Response is emitted as-is (HTTP Basic / Bearer challenges work). |
+| 300–310 (redirects) | Response is emitted as-is, then {@see Application::terminateAfterEmit()} runs (by default `die()`). No error action. |
+| 401 with `WWW-Authenticate` header already set | Response is emitted as-is (HTTP Basic / Bearer challenges work); same terminate hook as redirects. |
 | 400 / 401 / 403 / 404 | Mapped to error actions `bad-request`, `unauthorized`, `forbidden`, `not-found`; exception is logged; response is reset; `dispatchError()` runs. |
 | Anything else | Logged; response reset; `dispatchError('not-found')` runs (same fallback as a plain 404). |
 
 Use `BreakExecution` where UFW already expects it (auth gates in middleware, 404 inside router, redirects in helpers). It is not a substitute for ordinary validation.
+
+**Testing:** PHPUnit can define `UFW_APPLICATION_SUPPRESS_EXIT` as `true` before calling `Application::run()` so redirect and WWW-Authenticate paths call {@see Application::terminateAfterEmit()} without `die()` (same idea as `UFW_MYDIE_SUPPRESS_EXIT` for {@see mydie()}.
+
+### `mydie()` (debug only)
+
+Global helper in [`src/functions/mydie.php`](../src/functions/mydie.php) (Composer `autoload.files`). It echoes the message and caller location, then calls `die()` unless `UFW_MYDIE_SUPPRESS_EXIT` is defined and true — unit tests set that constant (`Functions/MydieTest`). The production `die()` path is not executed in those tests (intentional Clover gap).
 
 ### Path 2: any other `\Exception`
 

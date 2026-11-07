@@ -6,5 +6,5 @@
 
 ?>
 <div class="form-group <?php echo $element->getWrapClass() . ' ', ''; ?> ">
-    <?php echo $this->html5Tag()->full('button', $element->getAttribs(), $element->getCaption()); ?>
+    <?php echo $this->html5Tag()->full('button', $element->getAttribs(), (string) ($element->getCaption() ?? '')); ?>
 </div>

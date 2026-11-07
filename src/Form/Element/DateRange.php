@@ -7,8 +7,14 @@ namespace Ufw\Form\Element;
 class DateRange extends Input
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'text';
 
+    /**
+     * @var list<string>
+     */
     protected $defaultOptionsToAttribs = [
         'name',
         'id',
@@ -27,13 +33,22 @@ class DateRange extends Input
         'pattern'
     ];
 
+    /**
+     * @var string
+     */
     protected $renderScriptPath = 'form/daterange.php';
 
+    /**
+     * @return $this
+     */
     public function init()
     {
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getDefaultOptions()
     {
         return [
@@ -46,39 +61,76 @@ class DateRange extends Input
         ];
     }
 
+    /**
+     * @return mixed
+     */
     public function getValueFrom()
     {
-        return @$this->value['from'];
+        $value = $this->value;
+        if (!is_array($value)) {
+            return null;
+        }
+        return $value['from'] ?? null;
     }
 
+    /**
+     * @return mixed
+     */
     public function getValueTo()
     {
-        return @$this->value['to'];
+        $value = $this->value;
+        if (!is_array($value)) {
+            return null;
+        }
+        return $value['to'] ?? null;
     }
 
+    /**
+     * @param mixed $value
+     * @param array<string, mixed>|null $context
+     * @return $this
+     */
     public function setValue($value, $context = null)
     {
-        foreach ([
-            'from',
-            'to'
-        ] as $type) {
-            if (isset($value[$type])) {
-                if (preg_match('~\d{4}-\d{2}-\d{2}~', $value[$type])) {
-                    $value[$type] = \DateTime::createFromFormat('Y-m-d', $value[$type])->format($this->phpdateformat);
+        if (is_array($value)) {
+            $format = $this->getOption('phpdateformat');
+            $formatStr = is_string($format) ? $format : 'd. m. Y.';
+            foreach ([
+                'from',
+                'to'
+            ] as $type) {
+                if (isset($value[$type]) && is_string($value[$type]) && preg_match('~\d{4}-\d{2}-\d{2}~', $value[$type])) {
+                    $dt = \DateTime::createFromFormat('Y-m-d', $value[$type]);
+                    if ($dt instanceof \DateTime) {
+                        $value[$type] = $dt->format($formatStr);
+                    }
                 }
             }
         }
         return parent::setValue($value, $context);
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function getValueRaw()
     {
         $out = [];
+        $format = $this->getOption('phpdateformat');
+        $formatStr = is_string($format) ? $format : 'd. m. Y.';
+        $value = $this->value;
+        if (!is_array($value)) {
+            return [
+                'from' => '',
+                'to' => '',
+            ];
+        }
         foreach ([
             'from',
             'to'
         ] as $type) {
-            $date = \DateTime::createFromFormat($this->phpdateformat, $this->value[$type]);
+            $part = isset($value[$type]) && is_string($value[$type]) ? $value[$type] : '';
+            $date = $part !== '' ? \DateTime::createFromFormat($formatStr, $part) : false;
             $out[$type] = $date instanceof \DateTime ? $date->format('Y-m-d') : '';
         }
         return $out;

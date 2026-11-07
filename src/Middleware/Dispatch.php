@@ -14,11 +14,21 @@ class Dispatch extends Base
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler) : ResponseInterface
     {
-        try {
-            call_user_func([$this->getController(), $this->getController()->getCurrentActionMethod()]);
-        } catch (\Exception $e) {
-            throw $e;
+        $controller = $this->getController();
+        $method = $controller->getCurrentActionMethod();
+        if (!is_string($method) || $method === '') {
+            throw new \BadMethodCallException('Controller action is not callable: ' . (string) $method);
         }
+        try {
+            $action = new \ReflectionMethod($controller, $method);
+        } catch (\ReflectionException $e) {
+            throw new \BadMethodCallException('Controller action is not callable: ' . $method, 0, $e);
+        }
+        if (!$action->isPublic()) {
+            throw new \BadMethodCallException('Controller action is not callable: ' . $method);
+        }
+        $action->invoke($controller);
+
         return $handler->handle($request);
     }
 }

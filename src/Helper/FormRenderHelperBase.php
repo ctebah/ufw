@@ -15,11 +15,17 @@ abstract class FormRenderHelperBase extends Base
      */
     protected $baseScriptPath;
 
+    /**
+     * @return $this
+     */
     public function __invoke()
     {
         return $this;
     }
 
+    /**
+     * @return string
+     */
     public function form(\Ufw\Form\Base $form)
     {
         $viewScript = $form->getViewScript();
@@ -42,6 +48,10 @@ abstract class FormRenderHelperBase extends Base
         return $out;
     }
 
+    /**
+     * @param string|null $script
+     * @return string
+     */
     public function field(\Ufw\Form\Element\Base $element, $script = null)
     {
         if (!$script) {

@@ -8,7 +8,21 @@
 
 - Define **`behaviours()`** on your record class: return an array mapping **id → behaviour** (object or `['class' => MyBehaviour::class, 'option' => …]`).
 - Each behaviour extends **`Ufw\Model\Behaviour\Base`** and implements the event methods it cares about (`beforeSave`, `afterInsert`, `beforeDataSet`, …). The base class lists supported **method names** in `$behaviourMethods`.
-- The record’s **`onBeforeSave`**, **`onAfterInsert`**, etc. **run behaviours first**, then your own `beforeSave` / `afterInsert` on the record – order is predictable.
+- The record’s **`onBeforeSave`**, **`onAfterInsert`**, etc. **run behaviours first**, then your own `beforeSave` / `afterInsert` on the record. Order is the behaviour `order` property (lower first), not the array position. The same number keeps declaration order. A record overrides it with `'order' => 125` next to `'class'`.
+
+Bundled defaults, with gaps so an app can sit before, between, or after them:
+
+| Order | Behaviour |
+|------:|-----------|
+| 100 | `InsertId` |
+| 110 | `DefaultFieldValues` |
+| 120 | `ReadAfterSave` |
+| 130 | `Json` |
+| 140 | `ChangedOnly` |
+| 150 | `OptimisticLock` |
+| 500 | anything that does not set `order` |
+
+A row read through `fetch_object`, `reRead`, or a successful `save` keeps a copy of the values from that read. `Simple::update()` puts the primary key from that copy in `WHERE`. A record that was not read uses the key currently on the object.
 
 **Bundled examples** (under `Ufw\Model\Behaviour`):
 
@@ -16,7 +30,9 @@
 |-----------|------|
 | **`Json`** | Serialize/deserialize selected attributes as JSON in/out of scalar DB columns (`serialAttributes`). |
 | **`ReadAfterSave`** | After a successful save, re-read the row from SQL by PK so defaults/triggers on the server are visible in memory. |
-| **`DefaultFieldValues`**, **`InsertId`**, etc. | Housekeeping around inserts and defaults. |
+| **`DefaultFieldValues`**, **`InsertId`** | Housekeeping around inserts and defaults. |
+| **`ChangedOnly`** | On update, write columns that differ from the snapshot taken at fetch. No snapshot (a record built in memory) leaves the `SET` list alone, so the full row is still written. A primary key that differs from that snapshot is written; an unchanged one is left out. A `Db\Expression` is always written. Columns named on a sibling `Json` behaviour are compared as decoded JSON, not as the raw string. With `skipDefaultOverrides`, an update whose only differences are `DefaultFieldValues` always-values (such as `ts_updated`) is skipped; if anything else changed, those always-values are still written. |
+| **`OptimisticLock`** | Default column is `version` (`versionField`). `WHERE` uses the version from the read snapshot, or the value already on the record when there is no snapshot. A missing or empty token throws `LogicException` before the query. This is not a merge of the two rows. Zero affected rows raises `Ufw\Model\Exception\StaleRecord`. After a successful update the row is read back (one `SELECT`) so the next save of the same object carries the new version; skipped when the record already declares `ReadAfterSave`. An insert with an empty version stores `1`. |
 
 **Why use them:** timestamps, soft-delete flags, normalizing JSON columns, audit fields – **one behaviour**, many record classes.
 

@@ -7,15 +7,27 @@ namespace Ufw\Form\Element;
 interface SubElementsInterface
 {
 
+    /**
+     * @param \Ufw\Form\Base|null $form
+     * @return $this
+     */
     public function setForm(\Ufw\Form\Base $form = null);
 
     /**
-     *
-     * @param string $value            
+     * @param mixed $value
+     * @param array<string, mixed>|null $context
+     * @return $this
      */
     public function setValue($value, $context = null);
 
+    /**
+     * @return \Generator<string, mixed>
+     */
     public function yieldSubValues();
 
-    public function isValid($context);
+    /**
+     * @param array<string, mixed>|null $context
+     * @return bool
+     */
+    public function isValid($context = null);
 }

@@ -23,7 +23,9 @@ class JsonRequest extends Base
             if (JSON_ERROR_NONE !== json_last_error()) {
                 throw new InvalidArgumentException(sprintf('Unable to decode JSON - %s', json_last_error_msg()));
             }
-            $request->withParsedBody($json);
+            if (is_array($json)) {
+                $request = $request->withParsedBody($json);
+            }
         }
         return $handler->handle($request);
     }

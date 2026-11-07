@@ -7,5 +7,6 @@
  */
 $attribs = $element->getAttribs();
 $attribs['type'] = 'hidden';
-$attribs['value'] = (string) $element->getValue();
+$csrfValue = $element->getValue();
+$attribs['value'] = is_string($csrfValue) ? $csrfValue : '';
 echo $this->html5Tag()->void('input', $attribs);

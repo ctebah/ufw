@@ -4,64 +4,63 @@ namespace Ufw;
 /**
  * Process-wide key/value store (extends {@see \ArrayObject}) with {@see Singleton} access and optional {@see \SplObserver} notifications.
  *
+ * @extends \ArrayObject<string, mixed>
  * @method static Registry getInstance()
  */
 class Registry extends \ArrayObject implements \SplSubject
 {
     use Singleton;
 
+    /**
+     * @var array<string, array<int, \SplObserver>>
+     */
     private $observers = [
         '' => []
     ];
 
-    /**
-     * Constructs a parent ArrayObject with default
-     * ARRAY_AS_PROPS to allow acces as an object
-     *
-     * @param array $array
-     *            data array
-     * @param integer $flags
-     *            ArrayObject flags
-     */
     public function __construct()
     {
         parent::__construct(array(), \ArrayObject::STD_PROP_LIST | \ArrayObject::ARRAY_AS_PROPS);
     }
 
     /**
-     * getter method, basically same as offsetGet().
-     *
-     * This method can be called from an object of type Zend_Registry, or it
-     * can be called statically. In the latter case, it uses the default
-     * static instance stored in the class.
-     *
      * @param string $index
-     *            - get the value associated with $index
      * @return mixed
      */
     public function get($index)
     {
-        return @$this->offsetGet($index);
-    }
+        if (!$this->offsetExists($index)) {
+            return null;
+        }
 
-    public function remove($index)
-    {
-        return $this->offsetUnset($index);
+        return $this->offsetGet($index);
     }
 
     /**
-     * setter method, basically same as offsetSet().
-     *
-     * This method can be called from an object of type Zend_Registry, or it
-     * can be called statically. In the latter case, it uses the default
-     * static instance stored in the class.
-     *
+     * @return Application
+     */
+    public function getApplication()
+    {
+        $application = $this->get('application');
+        if (!$application instanceof Application) {
+            throw new \RuntimeException('Application is not registered.');
+        }
+        return $application;
+    }
+
+    /**
      * @param string $index
-     *            The location in the ArrayObject in which to store
-     *            the value.
+     * @return void
+     */
+    public function remove($index)
+    {
+        $this->offsetUnset($index);
+    }
+
+    /**
+     * @param string $index
      * @param mixed $value
-     *            The object to store in the ArrayObject.
-     * @return \Ufw\Registry
+     * @return $this
      */
     public function set($index, $value)
     {
@@ -71,18 +70,17 @@ class Registry extends \ArrayObject implements \SplSubject
     }
 
     /**
-     * Returns TRUE if the $index is a named value in the registry,
-     * or FALSE if $index was not found in the registry.
-     *
      * @param string $index
-     * @return boolean
+     * @return bool
      */
     public function has($index)
     {
         return $this->offsetExists($index);
     }
 
-    // add observer
+    /**
+     * @param string $regkey
+     */
     #[\ReturnTypeWillChange]
     public function attach(\SplObserver $observer, $regkey = '')
     {
@@ -95,27 +93,34 @@ class Registry extends \ArrayObject implements \SplSubject
         }
     }
 
-    // remove observer
+    /**
+     * @param string $regkey
+     */
     #[\ReturnTypeWillChange]
     public function detach(\SplObserver $observer, $regkey = '')
     {
-        $key = @array_search($observer, $this->observers[$regkey], true);
+        if (!isset($this->observers[$regkey])) {
+            return;
+        }
+        $key = array_search($observer, $this->observers[$regkey], true);
         if (false !== $key) {
-            unset($this->observers[$key]);
+            unset($this->observers[$regkey][$key]);
         }
     }
 
-    // notify observers(or some of them)
+    /**
+     * @param string $regkey
+     */
     #[\ReturnTypeWillChange]
     public function notify($regkey = '')
     {
         if (isset($this->observers[$regkey])) {
             foreach ($this->observers[$regkey] as $value) {
-                $value->update($this, $regkey);
+                $value->update($this);
             }
         }
         foreach ($this->observers[''] as $value) {
-            $value->update($this, '');
+            $value->update($this);
         }
     }
 }

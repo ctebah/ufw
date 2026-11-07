@@ -6,10 +6,12 @@
 
     $errors = $element->getErrors();
     $hasErrors = !!$errors;
-    $hasSuccess = @strlen($element->getValue()) && !$hasErrors && $element->getForm()->getValidated();
+    $elementValue = $element->getValue();
+    $hasSuccess = is_string($elementValue) && $elementValue !== '' && !$hasErrors && ($form = $element->getForm()) !== null && $form->getValidated();
 
     $attribs = $element->getAttribs();
-    $baseClass = $attribs['class'] ?? '';
+    $classAttrib = $attribs['class'] ?? '';
+    $baseClass = is_string($classAttrib) ? $classAttrib : '';
     if ($hasErrors) {
         $attribs['class'] = trim($baseClass . ' is-invalid');
         $attribs['aria-describedby'] = $element->getId() . '-errors';
@@ -22,7 +24,8 @@
     <?php if ($element->getLabel() && ($element->getLabelPlacement() == 'above')): ?>
         <label for="<?php echo $element->getId(); ?>" class="form-label <?php echo $element->getLabelClass(); ?>"><?php echo $element->getLabel(); ?></label>
     <?php endif; ?>
-    <?php echo $this->html5Tag()->full('textarea', $attribs, $element->getValue()); ?>
+    <?php $textareaContent = $element->getValue();
+    echo $this->html5Tag()->full('textarea', $attribs, is_string($textareaContent) ? $textareaContent : ''); ?>
     <?php if ($element->getLabel() && ($element->getLabelPlacement() == 'below')): ?>
         <label for="<?php echo $element->getId(); ?>" class="form-label <?php echo $element->getLabelClass(); ?>"><?php echo $element->getLabel(); ?></label>
     <?php endif; ?>

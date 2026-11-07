@@ -4,9 +4,17 @@ namespace Ufw\Helper;
 
 /**
  * Helpers that include PHP view scripts from the application tree with a fallback to framework `src/views/`.
+ *
+ * @method \Ufw\Helper\Html5Tag html5Tag()
+ * @method string partial(string $script, array<string, mixed> $vars = array())
+ * @method \Ufw\Placeholder placeholder(string $name)
+ * @method string html5Attribs(array<int|string, mixed> $attribs)
  */
 abstract class ViewRendererBase extends Base
 {
+    /**
+     * @var string|null
+     */
     protected static $fwViewsPath;
 
     /**
@@ -16,16 +24,25 @@ abstract class ViewRendererBase extends Base
      */
     protected function getFwViewsPath()
     {
-        if (!isset(self::$fwViewsPath)) {
-            self::$fwViewsPath = realpath(__DIR__ . '/../views');
+        if (self::$fwViewsPath === null) {
+            $path = realpath(__DIR__ . '/../views');
+            self::$fwViewsPath = $path !== false ? $path : '';
         }
         return self::$fwViewsPath;
     }
 
     /**
+     * @return string
+     */
+    protected function getScriptName()
+    {
+        return $this->getController()->getScriptName();
+    }
+
+    /**
      * Includes a view script: application `views/` first, then framework `src/views/`.
      *
-     * @param array $vars Variables passed into the script via {@see extract()}
+     * @param array<string, mixed> $vars Variables passed into the script via {@see extract()}
      * @param string|null $script Relative path under `views/`; default is current action script name + `.php`
      * @param bool $controllerDir When true, prefix with the controller {@see \Ufw\Controller\Base::getIdent()}
      * @return string Captured output
@@ -52,6 +69,7 @@ abstract class ViewRendererBase extends Base
             include $fwViews;
         }
 
-        return ob_get_clean();
+        $cleaned = ob_get_clean();
+        return $cleaned === false ? '' : $cleaned;
     }
 }

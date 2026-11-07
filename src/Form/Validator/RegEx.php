@@ -12,8 +12,7 @@ class RegEx extends Base
     const ERROROUS = 'regexErrorous';
 
     /**
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageTemplates = array(
         self::INVALID => "Invalid type given. String, integer or float expected",
@@ -22,14 +21,12 @@ class RegEx extends Base
     );
 
     /**
-     * Regular expression pattern
-     *
      * @var string
      */
     protected $_pattern;
 
     /**
-     * Sets validator options
+     * @param string $pattern
      */
     public function __construct($pattern)
     {
@@ -37,8 +34,6 @@ class RegEx extends Base
     }
 
     /**
-     * Returns the pattern option
-     *
      * @return string
      */
     public function getPattern()
@@ -47,9 +42,8 @@ class RegEx extends Base
     }
 
     /**
-     * Sets the pattern option
-     *
      * @param string $pattern
+     * @return $this
      */
     public function setPattern($pattern)
     {
@@ -58,10 +52,9 @@ class RegEx extends Base
     }
 
     /**
-     * Returns true if and only if $value matches against the pattern option
-     *
-     * @param string $value
-     * @return boolean
+     * @param mixed $value
+     * @param array<string, mixed>|null $context
+     * @return bool
      */
     public function isValid($value, $context = null)
     {
@@ -69,25 +62,42 @@ class RegEx extends Base
             $this->error(self::INVALID);
             return false;
         }
-        
-        if (!strlen($value)) {
+
+        $stringValue = (string) $value;
+        if (!strlen($stringValue)) {
             return true;
         }
-        
-        $this->setValue($value);
-        
-        $status = @preg_match($this->_pattern, $value);
-        
+
+        $this->setValue($stringValue);
+
+        $status = $this->matchPattern($stringValue);
+
         if (false === $status) {
             $this->error(self::ERROROUS);
             return false;
         }
-        
+
         if (!$status) {
             $this->error(self::NOT_MATCH);
             return false;
         }
-        
+
         return true;
+    }
+
+    /**
+     * @param string $stringValue
+     * @return int|false
+     */
+    private function matchPattern($stringValue)
+    {
+        set_error_handler(static function () {
+            return true;
+        }, E_WARNING);
+        try {
+            return preg_match($this->_pattern, $stringValue);
+        } finally {
+            restore_error_handler();
+        }
     }
 }

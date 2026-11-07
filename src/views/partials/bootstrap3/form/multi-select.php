@@ -6,7 +6,13 @@
 
     $errors = $element->getErrors();
     $hasErrors = !!$errors;
-    $hasSuccess = @strlen($element->getValue()) && !$hasErrors && $element->getForm()->getValidated();
+    $elementValue = $element->getValue();
+    $hasSuccess = ($element->getAllowMultiple()
+        ? (bool) array_filter((array) $elementValue, function ($v) {
+            return is_string($v) && $v !== '';
+        })
+        : (is_string($elementValue) && $elementValue !== ''))
+        && !$hasErrors && ($form = $element->getForm()) !== null && $form->getValidated();
 ?>
 <div class="form-group <?php echo $element->getWrapClass() . ' ', $element->isRequired() ? 'required ' : '', $hasSuccess ? 'has-success ' : '', $hasErrors ? 'has-error ' : '', $hasErrors || $hasSuccess ? 'has-feedback ' : ''; ?>">
     <?php if ($element->getLabel() && ($element->getLabelPlacement() == 'above')): ?>
@@ -16,10 +22,15 @@
     <?php echo $this->html5Tag()->open('select', $element->getAttribs()); ?>
     
     <?php foreach ($element->getMultiOptions() as $optKey => $optValue): ?>
-        <?php echo $this->html5Tag()->full('option', ['value' => $optKey, 'selected' => @strlen($element->getValue()) && ($element->getValue() == $optKey)], htmlspecialchars($optValue, ENT_QUOTES | ENT_HTML5)); ?>
+        <?php
+        $selected = $element->getAllowMultiple()
+            ? (is_array($elementValue) && in_array($optKey, $elementValue, false))
+            : (is_string($elementValue) && $elementValue !== '' && $elementValue == $optKey);
+        ?>
+        <?php echo $this->html5Tag()->full('option', ['value' => $optKey, 'selected' => $selected], htmlspecialchars(is_string($optValue) ? $optValue : '', ENT_QUOTES | ENT_HTML5)); ?>
     <?php endforeach; ?>
     
-    <?php echo $this->html5Tag()->close('select'); ?>
+    <?php echo $this->html5Tag()->close(); ?>
 
     <?php if ($element->getLabel() && ($element->getLabelPlacement() == 'below')): ?>
         <label for="<?php echo $element->getId(); ?>" class="<?php echo $element->getLabelClass(); ?>"><?php echo $element->getLabel(); ?></label>

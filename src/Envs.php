@@ -39,8 +39,8 @@ class Envs
             $application = $registry->get('application');
             if ($application instanceof Application) {
                 $cfg = $application->getConfig();
-                if (isset($cfg['env']) && $cfg['env'] !== '') {
-                    return (string) $cfg['env'];
+                if (isset($cfg['env']) && is_string($cfg['env']) && $cfg['env'] !== '') {
+                    return $cfg['env'];
                 }
             }
         }
@@ -53,7 +53,13 @@ class Envs
         }
 
         if (\defined('APPLICATION_ENV')) {
-            return (string) \constant('APPLICATION_ENV');
+            $env = \constant('APPLICATION_ENV');
+            if (is_string($env) && $env !== '') {
+                return $env;
+            }
+            if (is_int($env) || is_float($env)) {
+                return (string) $env;
+            }
         }
 
         return 'production';

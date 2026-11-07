@@ -8,6 +8,9 @@ namespace Ufw\Helper;
 class Placeholder extends Base
 {
 
+    /**
+     * @var \Ufw\Container<\Ufw\Placeholder>|null
+     */
     private static $container = null;
 
     public function __construct()
@@ -18,13 +21,24 @@ class Placeholder extends Base
         }
     }
 
+    /**
+     * @param string $name
+     * @return \Ufw\Placeholder
+     */
     public function __invoke($name)
     {
         return $this->placeholder($name);
     }
 
+    /**
+     * @param string $name
+     * @return \Ufw\Placeholder
+     */
     public function placeholder($name)
     {
+        if (self::$container === null) {
+            self::$container = new \Ufw\Container(\Ufw\Placeholder::class);
+        }
         return self::$container->get((string) $name);
     }
 }

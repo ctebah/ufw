@@ -7,6 +7,9 @@ namespace Ufw\Utils;
 class Stopwatch
 {
 
+    /**
+     * @var float
+     */
     protected $startedAt;
 
     public function __construct()
@@ -14,26 +17,35 @@ class Stopwatch
         $this->reset();
     }
 
-    // private
+    /**
+     * @return float
+     */
     protected function getmicrotime()
     {
         list ($usec, $sec) = explode(' ', microtime());
         return ((float) $usec + (float) $sec);
     }
 
-    // public - resets the timer
+    /**
+     * @return void
+     */
     public function reset()
     {
         $this->startedAt = $this->getmicrotime();
     }
 
-    // returns time elapsed
+    /**
+     * @return float
+     */
     public function elapsed()
     {
         return $this->getmicrotime() - $this->startedAt;
     }
 
-    // human readable elapsed time
+    /**
+     * @param int $decimals
+     * @return string
+     */
     public function elapsed_hr($decimals = 2)
     {
         $secondsNumber = 2 + ($decimals ? $decimals + 1 : 0);

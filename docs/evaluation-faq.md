@@ -220,9 +220,9 @@ Bottom line: treat adoption as a multi-year bet, like any framework - with small
 
 ### Tests, static analysis, long-term maintenance?
 
-The framework repository has historically prioritized shipping a coherent vertical slice over a large automated test matrix. You should plan your own tests and tools (PHPUnit, PHPStan/Psalm) in your project. [Framework analysis](framework-analysis.md) discusses gaps and recommendations honestly.
+The framework ships PHPUnit 11 (run on PHP 8.2) and PHPStan 2 level 10 on all of `src/` (no baseline). Library code stays compatible with PHP 7.4. The repo includes broad **unit** coverage (Application, forms, HTTP stack, ApiClient, views partials, Db helpers) and a **component** suite against MySQL for records and behaviours. Full browser or production E2E testing is still your application's job. How to run the suite: [testing.md](testing.md).
 
-Bottom line: good if you accept owning quality gates in application code; weaker if you require framework-level CI as your primary safety net.
+Bottom line: strong automated coverage and static analysis in the framework repo; plan your own tests for app-specific flows and deployment.
 
 ---
 

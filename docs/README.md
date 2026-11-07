@@ -106,6 +106,7 @@ Linear path from bootstrap to outbound HTTP.
 | [Helpers](helpers.md) | Helper resolution |
 | [InfoHash](info-hash.md) | Id-keyed collections, secondary index, compose narrow SQL |
 | [Middleware](middleware.md) | Pipe, JSON, layout, auth |
+| [Migration: 1.0 → 1.1](migration-1.0-to-1.1.md) | Opt-in features and changes when upgrading from 1.0 |
 | [Models and records](models-and-records.md) | Model / Record, relations (1–1 / 1–N / N–N) |
 | [OWASP Top 10:2025 audit](security-owasp-audit.md) | OWASP 2025 risks vs framework defaults and app duties |
 | [Records: behaviours & Solr](record-behaviours-solr.md) | Behaviours, Solr |
@@ -113,6 +114,7 @@ Linear path from bootstrap to outbound HTTP.
 | [Routing](routing.md) | Routes - essentials |
 | [Routing deep dive](routing-deep-dive.md) | Routing internals, custom routes, aliases |
 | [Security](security.md) | Overview + deployment checklist |
+| [Testing](testing.md) | PHPUnit 11 on PHP 8.2, PHPStan level 10 on `src/`, Docker MySQL |
 | [Views, layouts, partials](views-layouts-partials.md) | Views |
 
 ---

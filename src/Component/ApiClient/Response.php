@@ -8,58 +8,61 @@ class Response
 {
 
     /**
-     *
-     * @var array
+     * @var mixed
      */
     protected $body;
 
     /**
-     *
-     * @var int
+     * @var int|null
      */
     protected $code = null;
 
     /**
-     *
-     * @var \GuzzleHttp\Exception\BadResponseException
+     * @var \Throwable|null
      */
     protected $exception = null;
 
     /**
-     *
-     * @var \Psr\Http\Message\ResponseInterface
+     * @var \Psr\Http\Message\ResponseInterface|null
      */
     protected $response = null;
 
+    /**
+     * @param string $method
+     * @param array<int, mixed> $params
+     * @return mixed
+     */
     public function __call($method, array $params)
     {
-        return call_user_func_array(array(
-            isset($this->exception) ? $this->exception : $this->response,
-            $method
-        ), $params);
+        $target = $this->exception !== null ? $this->exception : $this->response;
+        if ($target === null) {
+            trigger_error('No response or exception to delegate to', E_USER_ERROR);
+        }
+        if (!method_exists($target, $method)) {
+            trigger_error("Method $method not found", E_USER_ERROR);
+        }
+
+        return $target->$method(...$params);
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function hasException()
     {
-        return !!$this->getException();
+        return $this->getException() !== null;
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function isOk()
     {
-        return !$this->getException();
+        return !$this->hasException();
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function isClientException()
     {
@@ -67,8 +70,7 @@ class Response
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function isRequestException()
     {
@@ -76,8 +78,7 @@ class Response
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function isServerError()
     {
@@ -85,14 +86,13 @@ class Response
     }
 
     /**
-     *
-     * @return array|string
+     * @return mixed
      */
     public function getBody()
     {
         if (!isset($this->body)) {
             if ($this->getResponse()) {
-                $body = $this->getResponse()->getBody();
+                $body = (string) $this->getResponse()->getBody();
                 if (preg_grep('~^application/json~', $this->getResponse()->getHeader('content-type'))) {
                     $body = json_decode($body, true);
                 }
@@ -103,9 +103,8 @@ class Response
     }
 
     /**
-     *
      * @param string $type
-     * @return NULL|array|string
+     * @return mixed
      */
     public function getMessage($type = 'error')
     {
@@ -114,8 +113,7 @@ class Response
     }
 
     /**
-     *
-     * @return int
+     * @return int|null
      */
     public function getCode()
     {
@@ -123,8 +121,8 @@ class Response
     }
 
     /**
-     *
      * @param int $code
+     * @return $this
      */
     public function setCode($code)
     {
@@ -133,8 +131,7 @@ class Response
     }
 
     /**
-     *
-     * @return \GuzzleHttp\Exception\BadResponseException
+     * @return \Throwable|null
      */
     public function getException()
     {
@@ -142,26 +139,33 @@ class Response
     }
 
     /**
-     *
-     * @param \GuzzleHttp\Exception\BadResponseException $exception
+     * @param \Exception $exception
+     * @return $this
      */
     public function setException(\Exception $exception)
     {
         if ($exception instanceof \GuzzleHttp\Exception\ConnectException) {
-            $exception = new \GuzzleHttp\Exception\ConnectException("Network error, please try again later.", $exception->getRequest(), $exception->getPrevious(), $exception->getHandlerContext());
+            $exception = new \GuzzleHttp\Exception\ConnectException(
+                "Network error, please try again later.",
+                $exception->getRequest(),
+                $exception->getPrevious(),
+                $exception->getHandlerContext()
+            );
         }
         
         $this->exception = $exception;
         $this->body = null;
-        if (method_exists($exception, 'hasRespons') && $exception->hasResponse()) {
-            $this->setResponse($exception->getResponse());
+        if ($exception instanceof \GuzzleHttp\Exception\RequestException && $exception->hasResponse()) {
+            $httpResponse = $exception->getResponse();
+            if ($httpResponse !== null) {
+                $this->setResponse($httpResponse);
+            }
         }
         return $this;
     }
 
     /**
-     *
-     * @return \Psr\Http\Message\ResponseInterface
+     * @return \Psr\Http\Message\ResponseInterface|null
      */
     public function getResponse()
     {
@@ -169,8 +173,8 @@ class Response
     }
 
     /**
-     *
      * @param \Psr\Http\Message\ResponseInterface $response
+     * @return $this
      */
     public function setResponse(\Psr\Http\Message\ResponseInterface $response)
     {

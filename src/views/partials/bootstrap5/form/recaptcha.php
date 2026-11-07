@@ -6,10 +6,12 @@
 
     $errors = $element->getErrors();
     $hasErrors = !!$errors;
+    $inputName = $element->getAttrib('name');
+    $inputName = is_string($inputName) ? $inputName : '';
 ?>
 <div class="mb-3 <?php echo $element->getWrapClass() . ' ', $element->isRequired() ? 'required ' : ''; ?>">
     <div id="<?php echo $element->getId(); ?>-visual" data-sitekey="" data-callback="recaptchaCallback"></div>
-    <input id="<?php echo $element->getId(); ?>" name="<?php echo $element->getAttrib('name'); ?>" value="" required tabindex="-1" style="width:50px; height:0; opacity:0; pointer-events:none; position:absolute; bottom:0;">
+    <input id="<?php echo $element->getId(); ?>" name="<?php echo $inputName; ?>" value="" required tabindex="-1" style="width:50px; height:0; opacity:0; pointer-events:none; position:absolute; bottom:0;">
     <?php if ($hasErrors): ?>
         <div id="<?php echo $element->getId(); ?>-errors" class="invalid-feedback d-block"><?php echo join('<br>', $errors); ?></div>
     <?php endif; ?>
@@ -46,7 +48,7 @@
 
     $(document).one('grecaptcha.loaded', function() {
         grecaptcha.render(inputId + '-visual', {
-            sitekey: '<?php echo $element->getOption('site_key'); ?>',
+            sitekey: '<?php $siteKey = $element->getOption('site_key'); echo is_string($siteKey) ? $siteKey : ''; ?>',
             size: 'normal',
             tabindex: 0,
             callback: recaptchaCallback,

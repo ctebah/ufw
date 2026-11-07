@@ -3,24 +3,33 @@ namespace Ufw\Component\ApiClient;
 
 /**
  * Guzzle-backed HTTP layer: {@see getApiEndpointConfig()} supplies `base_uri`, verbs return {@see Response}, {@see getLastResponse()} for debugging.
+ *
+ * @phpstan-consistent-constructor
  */
 abstract class Requester
 {
-    protected static $_instance = null;
+    /**
+     * @var static|null
+     */
+    protected static $_instance;
 
+    /**
+     * @var bool
+     */
     protected $debuglog = true;
 
+    /**
+     * @var \Monolog\Logger|null
+     */
     protected $logger = null;
 
     /**
-     *
-     * @var \GuzzleHttp\Client
+     * @var \GuzzleHttp\Client|null
      */
     protected $httpClient = null;
 
     /**
-     *
-     * @var \Ufw\Component\ApiClient\Response
+     * @var \Ufw\Component\ApiClient\Response|null
      */
     protected $lastResponse = null;
 
@@ -32,13 +41,13 @@ abstract class Requester
      * Should return associative array to use in \GuzzleHttp\Client constructor
      * Only requiered key is base_uri
      */
+    /**
+     * @return array<string, mixed>
+     */
     abstract protected function getApiEndpointConfig();
 
     /**
-     * Singleton model use get_called_class late static binding
-     * function to determine name of the called class.
-     *
-     * @return \Ufw\Component\ApiClient\Base
+     * @return static
      */
     public static function getInstance()
     {
@@ -51,8 +60,8 @@ abstract class Requester
     /**
      *
      * @param string $url
-     * @param array $body
-     * @param array $headers
+     * @param array<string, mixed> $body
+     * @param array<string, mixed> $headers
      *
      * @return \Ufw\Component\ApiClient\Response
      */
@@ -60,39 +69,39 @@ abstract class Requester
     {
         $ret = $this->doApiRequest('delete', $url, $body, $headers);
         $this->sleep();
-        return $ret;
+
+        return $this->requireResponse($ret);
     }
 
     /**
      *
      * @param string $url
-     * @param array $body
-     * @param array $headers
+     * @param array<string, mixed> $headers
      *
      * @return \Ufw\Component\ApiClient\Response
      */
     public function get($url, $headers = array())
     {
-        return $this->doApiRequest('get', $url, null, $headers);
+        return $this->requireResponse($this->doApiRequest('get', $url, null, $headers));
     }
 
     /**
      *
      * @param string $url
-     * @param array $headers
+     * @param array<string, mixed> $headers
      *
      * @return \Ufw\Component\ApiClient\Response
      */
     public function head($url, $headers = array())
     {
-        return $this->doApiRequest('head', $url, null, $headers);
+        return $this->requireResponse($this->doApiRequest('head', $url, null, $headers));
     }
 
     /**
      *
      * @param string $url
-     * @param array $body
-     * @param array $headers
+     * @param array<string, mixed> $body
+     * @param array<string, mixed> $headers
      *
      * @return \Ufw\Component\ApiClient\Response
      */
@@ -100,14 +109,15 @@ abstract class Requester
     {
         $ret = $this->doApiRequest('patch', $url, $body, $headers);
         $this->sleep();
-        return $ret;
+
+        return $this->requireResponse($ret);
     }
 
     /**
      *
      * @param string $url
-     * @param array $body
-     * @param array $headers
+     * @param array<string, mixed> $body
+     * @param array<string, mixed> $headers
      *
      * @return \Ufw\Component\ApiClient\Response
      */
@@ -115,14 +125,15 @@ abstract class Requester
     {
         $ret = $this->doApiRequest('post', $url, $body, $headers);
         $this->sleep();
-        return $ret;
+
+        return $this->requireResponse($ret);
     }
 
     /**
      *
      * @param string $url
-     * @param array $body
-     * @param array $headers
+     * @param array<string, mixed> $body
+     * @param array<string, mixed> $headers
      *
      * @return \Ufw\Component\ApiClient\Response
      */
@@ -130,9 +141,16 @@ abstract class Requester
     {
         $ret = $this->doApiRequest('put', $url, $body, $headers);
         $this->sleep();
-        return $ret;
+
+        return $this->requireResponse($ret);
     }
 
+    /**
+     * @param string $method
+     * @param string $url
+     * @param array<string, mixed> $options
+     * @return \Ufw\Component\ApiClient\Response|null
+     */
     public function raw($method, $url, $options)
     {
         try {
@@ -151,11 +169,18 @@ abstract class Requester
         return $this->getLastResponse();
     }
 
+    /**
+     * @return $this
+     */
     protected function sleep()
     {
         return $this;
     }
 
+    /**
+     * @param \Exception $e
+     * @return \Ufw\Component\ApiClient\Response
+     */
     protected function createExceptionResponse(\Exception $e)
     {
         $response = new \Ufw\Component\ApiClient\Response();
@@ -163,6 +188,9 @@ abstract class Requester
         return $response;
     }
 
+    /**
+     * @return \Ufw\Component\ApiClient\Response
+     */
     protected function createResponse(\Psr\Http\Message\ResponseInterface $resp)
     {
         $response = new \Ufw\Component\ApiClient\Response();
@@ -174,25 +202,24 @@ abstract class Requester
      *
      * @param string $method
      * @param string $url
-     * @param array|null $body
-     * @param array $headers
+     * @param array<string, mixed>|null $body
+     * @param array<string, mixed> $headers
      *
-     * @return \Ufw\Component\ApiClient\Response
+     * @return \Ufw\Component\ApiClient\Response|null
      */
     protected function doApiRequest($method, $url, $body, $headers)
     {
         try {
-            $response = call_user_func_array(array(
-                $this->getHttpClient(),
-                $method
-            ), array(
-                $url,
-                array_filter(array(
-                    'json' => $body,
-                    'headers' => $headers + $this->getHeadersForRequest()
-                ), 'is_not_null')
-            ));
-            $this->createResponse($response);
+            $client = $this->getHttpClient();
+            $response = $client->$method($url, array_filter(array(
+                'json' => $body,
+                'headers' => $headers + $this->getHeadersForRequest()
+            ), function ($value) {
+                return $value !== null;
+            }));
+            if ($response instanceof \Psr\Http\Message\ResponseInterface) {
+                $this->createResponse($response);
+            }
         } catch (\GuzzleHttp\Exception\ServerException $e) {
             $this->createExceptionResponse($e);
         } catch (\GuzzleHttp\Exception\ClientException $e) {
@@ -206,6 +233,9 @@ abstract class Requester
         return $this->getLastResponse();
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function getHeadersForRequest()
     {
         $headers = array(
@@ -220,14 +250,20 @@ abstract class Requester
      */
     protected function getHttpClient()
     {
-        if (!isset($this->httpClient)) {
+        if ($this->httpClient === null) {
             $opts = $this->getApiEndpointConfig();
             
             if ($this->debuglog) {
+                $app = $this->getApplication();
+                $urlHelper = $app !== null ? $app->getHelper('url') : null;
+                $logPrefix = '';
+                if ($urlHelper instanceof \Ufw\Helper\Url && isset($_SERVER['HTTP_HOST']) && is_string($_SERVER['HTTP_HOST'])) {
+                    $https = $_SERVER['HTTPS'] ?? '';
+                    $secure = is_string($https) && $https !== '' && strtolower($https) !== 'off';
+                    $logPrefix = ($secure ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . $urlHelper->url([], false, true) . "\n";
+                }
                 $opts['handler'] = $this->createLoggingHandlerStack([
-                    'http' . (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . $this->getApplication()
-                        ->getHelper('url')
-                        ->url([], false, true) . "\n{req_headers}\n{req_body}" . "\nRESPONSE:\n{res_headers}\n{res_body}\n\n"
+                    $logPrefix . "{req_headers}\n{req_body}" . "\nRESPONSE:\n{res_headers}\n{res_body}\n\n"
                 ]);
             }
             
@@ -236,6 +272,10 @@ abstract class Requester
         return $this->httpClient;
     }
 
+    /**
+     * @param list<string> $messageFormats
+     * @return \GuzzleHttp\HandlerStack
+     */
     protected function createLoggingHandlerStack(array $messageFormats)
     {
         $stack = \GuzzleHttp\HandlerStack::create();
@@ -247,15 +287,45 @@ abstract class Requester
         return $stack;
     }
 
+    /**
+     * @param string $messageFormat
+     * @return callable
+     */
     protected function createGuzzleLoggingMiddleware($messageFormat)
     {
         return \GuzzleHttp\Middleware::log($this->getLogger(), new \GuzzleHttp\MessageFormatter($messageFormat));
     }
 
+    /**
+     * @return string
+     */
+    protected function classPathSlashesForLogger()
+    {
+        $classPath = $this->pregReplaceClassPathSlashes(get_class($this));
+        if ($classPath === null) {
+            return 'api';
+        }
+
+        return $classPath;
+    }
+
+    /**
+     * @param class-string $className
+     * @return string|null
+     */
+    protected function pregReplaceClassPathSlashes($className)
+    {
+        return preg_replace('~\\\\~', '/', $className);
+    }
+
+    /**
+     * @return \Monolog\Logger
+     */
     protected function getLogger()
     {
         if (!$this->logger) {
-            $handler = new \Monolog\Handler\RotatingFileHandler(\Ufw\Paths::application() . '/log/apiclient/' . basename(dirname(preg_replace('~\\\\~', '/', get_class($this)))) . '.log');
+            $classPath = $this->classPathSlashesForLogger();
+            $handler = new \Monolog\Handler\RotatingFileHandler(\Ufw\Paths::application() . '/log/apiclient/' . basename(dirname($classPath)) . '.log');
             $formatter = new \Monolog\Formatter\LineFormatter('[%datetime%] %level_name%: %message%', null, true, true);
             $handler->setFormatter($formatter);
             $this->logger = (new \Monolog\Logger('api-consumer'))->pushHandler($handler);
@@ -266,8 +336,8 @@ abstract class Requester
     }
 
     /**
-     *
-     * @param \GuzzleHttp\Client $client
+     * @param \GuzzleHttp\Client $httpClient
+     * @return $this
      */
     protected function setHttpClient(\GuzzleHttp\Client $httpClient)
     {
@@ -276,8 +346,7 @@ abstract class Requester
     }
 
     /**
-     *
-     * @return \Ufw\Component\ApiClient\Response
+     * @return \Ufw\Component\ApiClient\Response|null
      */
     public function getLastResponse()
     {
@@ -285,8 +354,8 @@ abstract class Requester
     }
 
     /**
-     *
      * @param \Ufw\Component\ApiClient\Response $lastResponse
+     * @return $this
      */
     protected function setLastResponse(\Ufw\Component\ApiClient\Response $lastResponse)
     {
@@ -295,11 +364,28 @@ abstract class Requester
     }
 
     /**
-     *
-     * @return \Ufw\Application
+     * @return \Ufw\Application|null
      */
     protected function getApplication()
     {
-        return \Ufw\Registry::getInstance()->get('application');
+        $app = \Ufw\Registry::getInstance()->get('application');
+        if ($app instanceof \Ufw\Application) {
+            return $app;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param \Ufw\Component\ApiClient\Response|null $response
+     * @return \Ufw\Component\ApiClient\Response
+     */
+    protected function requireResponse($response)
+    {
+        if ($response === null) {
+            throw new \RuntimeException('API request did not produce a response');
+        }
+
+        return $response;
     }
 }

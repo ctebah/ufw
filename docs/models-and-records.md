@@ -17,6 +17,8 @@ A **Record** is an active-record-like object around **one primary key shape** â€
 
 Hydration from MySQL: `static::dbfactory($row)`; `Db::fetch_object` / `fetch_all` set `isNewRecord` to false when loading.
 
+**PHPStan:** row columns accessed as `$record->column` need `@property` / `@property-read` on that record class when you want PHPStan to know column types (framework analysis is level 10 on `src/`). Dynamic or behaviour-driven field names can stay on `getAll()` / array access instead.
+
 **`ReadOnlyRecord`** (`Ufw\Model\Record\ReadOnlyRecord`) â€“ abstract base that overrides persistence so `save()` / `delete()` always throw (e.g. rows mapped from read-only SQL views). Older code may have extended a class named `ReadOnly`; that name is invalid on **PHP 8.1+** because `readonly` is a reserved keyword, so use **`ReadOnlyRecord`** instead.
 
 ## Model (`Ufw\Model\Base`)

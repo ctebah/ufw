@@ -65,10 +65,13 @@ Element-level option that reads config indirectly:
 |-----|---------|---------|
 | `env` | `Envs::runtimeLabel()` | Runtime label (e.g. `development`, `production`). See [flavors-multi-app.md](flavors-multi-app.md) and `Helper\Menu` `env` item filter. |
 | `flavor` | Your app | Not read by UFW core; common application-level key for multi-tenant / multi-product setups. See [flavors-multi-app.md](flavors-multi-app.md). |
+| `db.class` | `Db::forApp()` via `getDb()` | Subclass of `\Ufw\Db\Db` returned by record, model, and controller `getDb()`. Absent, or config not loaded yet, means `\Ufw\Db\Db`. Does not change `\Ufw\Db\Db::instance()`. See [database.md](database.md). |
 
 ## `config/dbconns.php`
 
 Returns an associative array keyed by **`conn_ident`** string. Each entry is consumed by `Ufw\Db\Db::connect()`.
+
+One optional top-level key is not a connection: **`___opts`**, an array of Db options. The first `Db` constructed in the process reads it and then drops the key so it is never a `conn_ident`. Options: **`throwOnError`** (absent means silent query errors), **`logFile`** (absent means `application/log/error_dblog.tmp`; `false` or `''` disables the file), **`logPost`** (absent means the log includes `$_POST`). See [database.md](database.md).
 
 | Entry key | Required | Purpose |
 |-----------|----------|---------|

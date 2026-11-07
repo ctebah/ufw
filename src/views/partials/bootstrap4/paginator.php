@@ -1,15 +1,17 @@
 <?php
 /**
- * @var int $count
- * @var int $page current page
- * @var int $perPage items per page
- * @var int $pagesToShow number of pages to show
+ * @var mixed $count
+ * @var string|null $routeName
  * @var \Ufw\Helper\Render $this
  */
 
-$page = (int) $page;
-$perPage = (int) $perPage;
-$pagesToShow = isset($pagesToShow) ? (int) $pagesToShow : 0;
+if (!isset($count) || !is_numeric($count)) {
+    return;
+}
+$count = (int) $count;
+$page = (isset($page) && is_numeric($page)) ? (int) $page : 1;
+$perPage = (isset($perPage) && is_numeric($perPage)) ? (int) $perPage : 0;
+$pagesToShow = (isset($pagesToShow) && is_numeric($pagesToShow)) ? (int) $pagesToShow : 0;
 $c = $this->getController();
 if (!isset($routeName)) {
     $routeName = 'default';
@@ -19,7 +21,8 @@ if ($page < 1) {
     $page = 1;
 }
 if ($perPage < 1) {
-    $perPage = $c::PER_PAGE;
+    $defaultPerPage = $c::PER_PAGE;
+    $perPage = is_numeric($defaultPerPage) ? (int) $defaultPerPage : 10;
 }
 if ($pagesToShow < 1) {
     $pagesToShow = 11;

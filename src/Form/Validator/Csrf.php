@@ -20,7 +20,7 @@ class Csrf extends Base
     protected $componentClass;
 
     /**
-     * @var array
+     * @var array<string, string>
      */
     protected $messageTemplates = [
         self::INVALID => 'Security token invalid or expired. Please reload the form and try again.',
@@ -35,6 +35,11 @@ class Csrf extends Base
         $this->componentClass = $componentClass;
     }
 
+    /**
+     * @param mixed $value
+     * @param array<string, mixed>|null $context
+     * @return bool
+     */
     public function isValid($value, $context = null)
     {
         $this->setValue($value);

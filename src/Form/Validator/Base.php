@@ -8,61 +8,59 @@ abstract class Base
 {
 
     /**
-     * Array of validation failure messages
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messages = array();
 
     /**
-     * Validation failure message template definitions
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageTemplates = array();
 
     /**
-     * Additional variables available for validation failure messages
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageVariables = array();
 
     /**
-     * Flag indidcating whether or not value should be obfuscated in error
-     * messages
-     *
      * @var bool
      */
     protected $obscureValue = false;
 
     /**
-     *
-     * @var \Ufw\Form\Element\Base
+     * @var \Ufw\Form\Element\Base|null
      */
     protected $element = null;
 
+    /**
+     * @var mixed
+     */
     protected $value;
 
+    /**
+     * @param mixed $value
+     * @param array<string, mixed>|null $context
+     * @return bool
+     */
     abstract public function isValid($value, $context = null);
 
     /**
      * Key for {@see \Ufw\Form\Validators::addValidator()} when passing an instance.
-     * Derived from {@see get_class()} (backslashes → underscores) for backward compatibility and stable keys for anonymous classes.
      */
     public function getName(): string
     {
-        return trim(preg_replace('~\\\\~', '_', get_class($this)), '\\');
+        return trim((string) preg_replace('~\\\\~', '_', get_class($this)), '\\');
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function getErrors()
     {
         return $this->getMessages();
     }
 
     /**
-     * Sets the value to be validated and clears the messages and errors arrays
-     *
      * @param mixed $value
      * @return void
      */
@@ -73,35 +71,32 @@ abstract class Base
     }
 
     /**
-     *
-     * @param string $messageKey
-     * @param string $value
-     *            OPTIONAL
+     * @param string|null $messageKey
+     * @param mixed $value
      * @return void
      */
     protected function error($messageKey, $value = null)
     {
         if ($messageKey === null) {
             $keys = array_keys($this->messageTemplates);
-            $messageKey = current($keys);
+            $messageKey = (string) current($keys);
+        }
+        if ($messageKey === '') {
+            return;
         }
         if ($value === null) {
             $value = $this->value;
         }
-        $this->messages[$messageKey] = $this->createMessage($messageKey, $value);
+        $message = $this->createMessage($messageKey, $value);
+        if ($message !== null) {
+            $this->messages[$messageKey] = $message;
+        }
     }
 
     /**
-     * Constructs and returns a validation failure message with the given message key and value.
-     *
-     * Returns null if and only if $messageKey does not correspond to an existing template.
-     *
-     * If a translator is available and a translation exists for $messageKey,
-     * the translation will be used.
-     *
      * @param string $messageKey
-     * @param string $value
-     * @return string
+     * @param mixed $value
+     * @return string|null
      */
     protected function createMessage($messageKey, $value)
     {
@@ -112,33 +107,33 @@ abstract class Base
         $message = $this->messageTemplates[$messageKey];
 
         if (is_object($value)) {
-            if (!in_array('__toString', get_class_methods($value))) {
-                $value = get_class($value) . ' object';
+            if (method_exists($value, '__toString')) {
+                $value = (string) $value;
             } else {
-                $value = $value->__toString();
+                $value = get_class($value) . ' object';
             }
         } elseif (is_array($value)) {
             $value = $this->implodeRecursive($value);
+        } elseif (is_scalar($value)) {
+            $value = (string) $value;
         } else {
-            $value = implode((array) $value);
+            $value = '';
         }
 
         if ($this->getObscureValue()) {
-            $value = str_repeat('*', strlen($value));
+            $value = str_repeat('*', strlen((string) $value));
         }
 
-        $message = str_replace('%value%', $value, $message);
+        $message = str_replace('%value%', (string) $value, $message);
         foreach ($this->messageVariables as $ident => $property) {
-            $message = str_replace("%$ident%", implode(' ', (array) $this->$property), $message);
+            $message = str_replace("%$ident%", $this->messageVariableToString($this->$property), $message);
         }
 
         return $this->translate($message);
     }
 
     /**
-     * Joins elements of a multidimensional array
-     *
-     * @param array $pieces
+     * @param array<int|string, mixed> $pieces
      * @return string
      */
     protected function implodeRecursive(array $pieces)
@@ -148,7 +143,7 @@ abstract class Base
             if (is_array($item)) {
                 $values[] = $this->implodeRecursive($item);
             } else {
-                $values[] = $item;
+                $values[] = $this->scalarOrObjectToString($item);
             }
         }
 
@@ -156,9 +151,42 @@ abstract class Base
     }
 
     /**
-     * Retrieve flag indicating whether or not value should be obfuscated in
-     * messages
-     *
+     * @param mixed $value
+     * @return string
+     */
+    protected function messageVariableToString($value)
+    {
+        if (is_array($value)) {
+            $parts = array();
+            foreach ($value as $item) {
+                $parts[] = $this->scalarOrObjectToString($item);
+            }
+            return implode(' ', $parts);
+        }
+
+        return $this->scalarOrObjectToString($value);
+    }
+
+    /**
+     * @param mixed $value
+     * @return string
+     */
+    protected function scalarOrObjectToString($value)
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value) || is_bool($value)) {
+            return (string) $value;
+        }
+        if (is_object($value) && method_exists($value, '__toString')) {
+            return (string) $value;
+        }
+
+        return '';
+    }
+
+    /**
      * @return bool
      */
     public function getObscureValue()
@@ -167,9 +195,8 @@ abstract class Base
     }
 
     /**
-     * Set flag indicating whether or not value should be obfuscated in messages
-     *
      * @param bool $flag
+     * @return $this
      */
     public function setObscureValue($flag)
     {
@@ -178,9 +205,7 @@ abstract class Base
     }
 
     /**
-     * Returns an array of the names of variables that are used in constructing validation failure messages
-     *
-     * @return array
+     * @return list<string>
      */
     public function getMessageVariables()
     {
@@ -188,9 +213,7 @@ abstract class Base
     }
 
     /**
-     * Returns the message templates from the validator
-     *
-     * @return array
+     * @return array<string, string>
      */
     public function getMessageTemplates()
     {
@@ -198,9 +221,7 @@ abstract class Base
     }
 
     /**
-     * Returns array of validation failure messages
-     *
-     * @return array
+     * @return array<string, string>
      */
     public function getMessages()
     {
@@ -208,8 +229,7 @@ abstract class Base
     }
 
     /**
-     *
-     * @return \Ufw\Form\Element\Base
+     * @return \Ufw\Form\Element\Base|null
      */
     public function getElement()
     {
@@ -217,8 +237,8 @@ abstract class Base
     }
 
     /**
-     *
-     * @param \Ufw\Form\Element\Base $element
+     * @param \Ufw\Form\Element\Base|null $element
+     * @return $this
      */
     public function setElement(\Ufw\Form\Element\Base $element = null)
     {
@@ -227,21 +247,37 @@ abstract class Base
     }
 
     /**
-     *
      * @return \Ufw\Application
      */
     protected function getApplication()
     {
-        return \Ufw\Registry::getInstance()->get('application');
+        $application = \Ufw\Registry::getInstance()->get('application');
+        if (!$application instanceof \Ufw\Application) {
+            throw new \RuntimeException('Application is not registered.');
+        }
+        return $application;
     }
 
+    /**
+     * @param string $name
+     * @return \Ufw\Helper\Base|null
+     */
     protected function getHelper($name)
     {
         return $this->getApplication()->getHelper($name);
     }
 
+    /**
+     * @param string $str
+     * @return string
+     */
     protected function translate($str)
     {
-        return $this->getHelper('translate')->translate($str);
+        $helper = $this->getHelper('translate');
+        if ($helper === null) {
+            return $str;
+        }
+
+        return $helper->translate($str);
     }
 }

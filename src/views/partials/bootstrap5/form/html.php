@@ -9,7 +9,8 @@
     <?php if ($element->getLabel() && ($element->getLabelPlacement() == 'above')): ?>
         <label for="<?php echo $element->getId(); ?>" class="form-label <?php echo $element->getLabelClass(); ?>"><?php echo $element->getLabel(); ?></label>
     <?php endif; ?>
-    <?php echo $this->html5Tag()->full('div', $element->getAttribs(), $element->getValue()); ?>
+    <?php $htmlContent = $element->getValue();
+echo $this->html5Tag()->full('div', $element->getAttribs(), is_string($htmlContent) ? $htmlContent : ''); ?>
     <?php if ($element->getLabel() && ($element->getLabelPlacement() == 'below')): ?>
         <label for="<?php echo $element->getId(); ?>" class="form-label <?php echo $element->getLabelClass(); ?>"><?php echo $element->getLabel(); ?></label>
     <?php endif; ?>

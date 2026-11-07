@@ -13,7 +13,7 @@ class Strings
     /**
      * Word delimiter characters
      *
-     * @var array
+     * @var array<int, string>
      */
     protected $wordDelimiter = array(
         '-',
@@ -24,14 +24,12 @@ class Strings
      * Formats a string from a URI into a PHP-friendly name.
      *
      * By default, replaces words separated by the word separator character(s)
-     * with camelCaps. If $isAction is false, it also preserves replaces words
-     * separated by the path separation character with an underscore, making
-     * the following word Title cased. All non-alphanumeric characters are
-     * removed.
+     * with camelCaps. Segments joined with `_` become lowerCamelCase as a whole.
+     * All non-alphanumeric characters are removed.
      *
-     * @param string $unformatted
-     * @param boolean $isAction
-     *            Defaults to false
+     * @param string|array<int, string> $unformatted
+     * @param string $suffix
+     * @param array<int, string>|null $wordDelimiters
      * @return string
      */
     public function formatToPhpFriendlyName($unformatted, $suffix = '', $wordDelimiters = null)
@@ -40,7 +38,7 @@ class Strings
         
         foreach ($segments as $key => $segment) {
             $segment = str_replace($wordDelimiters ?? $this->getWordDelimiter(), ' ', strtolower($segment));
-            $segment = preg_replace('/[^a-z0-9 ]/', '', $segment);
+            $segment = $this->stripNonAlphanumeric($segment);
             $segments[$key] = str_replace(' ', '', ucwords($segment));
         }
         
@@ -49,8 +47,30 @@ class Strings
     }
 
     /**
-     *
-     * @return array
+     * @param string $segment
+     * @return string
+     */
+    protected function stripNonAlphanumeric($segment)
+    {
+        $result = $this->pregReplaceStrip($segment);
+        if (!is_string($result)) {
+            return '';
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param string $segment
+     * @return string|null
+     */
+    protected function pregReplaceStrip($segment)
+    {
+        return preg_replace('/[^a-z0-9 ]/', '', $segment);
+    }
+
+    /**
+     * @return array<int, string>
      */
     public function getWordDelimiter()
     {
@@ -58,8 +78,8 @@ class Strings
     }
 
     /**
-     *
-     * @param array $wordDelimiter
+     * @param array<int, string> $wordDelimiter
+     * @return $this
      */
     public function setWordDelimiter(array $wordDelimiter)
     {

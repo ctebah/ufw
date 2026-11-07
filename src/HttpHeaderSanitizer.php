@@ -19,33 +19,40 @@ class HttpHeaderSanitizer
     }
 
     /**
-     * @param string|string[] $value
-     * @return string|string[]
+     * @param mixed $value
+     * @return string|array<int|string, string>
      */
     public static function sanitizeValue($value)
     {
         if (is_array($value)) {
             $out = [];
             foreach ($value as $v) {
-                $out[] = is_string($v) ? trim($v) : $v;
+                if (is_string($v)) {
+                    $out[] = trim($v);
+                }
             }
             return $out;
         }
 
-        return is_string($value) ? trim($value) : $value;
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
     }
 
     /**
      * SAPI/marshalHeadersFromSapi: normalize leading/trailing whitespace on keys and values.
      *
-     * @param array<string, string|string[]> $headers
-     * @return array<string, string|string[]>
+     * @param array<int|string, mixed> $headers
+     * @return array<string, string|array<int|string, string>>
      */
     public static function sanitizeHeadersArray(array $headers): array
     {
         $out = [];
         foreach ($headers as $name => $value) {
-            $out[self::sanitizeName($name)] = self::sanitizeValue($value);
+            $headerName = is_string($name) ? $name : (string) $name;
+            $out[self::sanitizeName($headerName)] = self::sanitizeValue($value);
         }
 
         return $out;

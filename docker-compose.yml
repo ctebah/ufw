@@ -1,0 +1,29 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ufw
+      MYSQL_DATABASE: ufw_test
+    ports:
+      - "13306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pufw"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  php:
+    build: ./docker/php
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      UFW_TEST_DB_HOST: mysql
+      UFW_TEST_DB_PORT: "3306"
+      UFW_TEST_DB_USER: root
+      UFW_TEST_DB_PASS: ufw
+      UFW_TEST_DB_NAME: ufw_test
+    depends_on:
+      mysql:
+        condition: service_healthy

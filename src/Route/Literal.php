@@ -13,10 +13,10 @@ class Literal extends Base
 
     public function matchRequestPath($path)
     {
-        if (!isset($this->routeDef['path'])) {
+        if (!isset($this->routeDef['path']) || !is_string($this->routeDef['path'])) {
             return false;
         }
-        $want = self::normalizePath((string) $this->routeDef['path']);
+        $want = self::normalizePath($this->routeDef['path']);
         $got = self::normalizePath($path);
         if ($want !== $got) {
             return false;
@@ -27,10 +27,18 @@ class Literal extends Base
         ];
     }
 
+    /**
+     * @param array<string, mixed> $params
+     * @param bool $reset
+     * @param bool $withQS
+     * @param bool $encode
+     * @return string
+     */
     public function buildUrl($params = array(), $reset = true, $withQS = false, $encode = true)
     {
         $params = $this->prepareBuildUrlParams($params, $reset);
-        $fixedPath = self::normalizePath((string) $this->routeDef['path']);
+        $pathDef = isset($this->routeDef['path']) && is_string($this->routeDef['path']) ? $this->routeDef['path'] : '/';
+        $fixedPath = self::normalizePath($pathDef);
 
         return $this->finalizeBuildUrlFromSegments([$fixedPath], $params, $withQS, $encode);
     }

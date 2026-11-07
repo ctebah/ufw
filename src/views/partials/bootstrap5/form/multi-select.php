@@ -6,11 +6,17 @@
 
     $errors = $element->getErrors();
     $hasErrors = !!$errors;
-    $hasSuccess = ($element->getAllowMultiple() ? @array_filter($element->getValue(), 'strlen') : @strlen($element->getValue()))
-        && !$hasErrors && $element->getForm()->getValidated();
+    $elementValue = $element->getValue();
+    $hasSuccess = ($element->getAllowMultiple()
+        ? (bool) array_filter((array) $elementValue, function ($v) {
+            return is_string($v) && $v !== '';
+        })
+        : (is_string($elementValue) && $elementValue !== ''))
+        && !$hasErrors && ($form = $element->getForm()) !== null && $form->getValidated();
 
     $attribs = $element->getAttribs();
-    $baseClass = $attribs['class'] ?? '';
+    $classAttrib = $attribs['class'] ?? '';
+    $baseClass = is_string($classAttrib) ? $classAttrib : '';
     if ($hasErrors) {
         $attribs['class'] = trim($baseClass . ' is-invalid');
         $attribs['aria-describedby'] = $element->getId() . '-errors';
@@ -27,11 +33,17 @@
     <?php echo $this->html5Tag()->open('select', $attribs); ?>
 
     <?php foreach ($element->getMultiOptions() as $optKey => $optValue): ?>
-        <?php $selected = $element->getAllowMultiple() ? in_array($optKey, $element->getValue()) : @strlen($element->getValue()) && ($element->getValue() == $optKey); ?>
-        <?php echo $this->html5Tag()->full('option', ['value' => $optKey, 'selected' => $selected], htmlspecialchars($optValue, ENT_QUOTES | ENT_HTML5)); ?>
+        <?php
+        $elementValue = $element->getValue();
+        $selected = $element->getAllowMultiple()
+            ? (is_array($elementValue) && in_array($optKey, $elementValue, false))
+            : (is_string($elementValue) && $elementValue !== '' && $elementValue == $optKey);
+        $optLabel = is_string($optValue) ? $optValue : '';
+        ?>
+        <?php echo $this->html5Tag()->full('option', ['value' => $optKey, 'selected' => $selected], htmlspecialchars(is_string($optValue) ? $optValue : '', ENT_QUOTES | ENT_HTML5)); ?>
     <?php endforeach; ?>
 
-    <?php echo $this->html5Tag()->close('select'); ?>
+    <?php echo $this->html5Tag()->close(); ?>
 
     <?php if ($element->getLabel() && ($element->getLabelPlacement() == 'below')): ?>
         <label for="<?php echo $element->getId(); ?>" class="form-label <?php echo $element->getLabelClass(); ?>"><?php echo $element->getLabel(); ?></label>

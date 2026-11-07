@@ -32,6 +32,7 @@ Before implementing anything non-trivial, read:
 ## Editing rules
 
 - Keep diffs focused and minimal; do not do opportunistic refactors.
+- **English only** for documentation, comments, CLI/script output, and test fixtures (except data that deliberately tests i18n or Unicode).
 - Do not modify `vendor/`.
 - Preserve existing naming and folder conventions.
 - If touching framework partials/helpers, check app-level override/fallback behavior.
@@ -66,3 +67,8 @@ Stop and ask before proceeding if a task implies:
 - new dependency introduction,
 - changing established defaults used by existing apps,
 - destructive data/file operations.
+
+## Other agent entry points
+
+- **`CLAUDE.md`** — symlink to this file for Claude Code; **canonical text is only `AGENTS.md`**.
+- Edit **`AGENTS.md`** only. Recreate the link after clone if missing: `ln -sf AGENTS.md CLAUDE.md` (Unix/WSL) or enable Windows **Developer Mode** and `git config core.symlinks true` so Git checks out the symlink.

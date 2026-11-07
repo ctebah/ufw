@@ -9,11 +9,19 @@ namespace Ufw\Helper;
 class Html5Attribs extends Base
 {
 
+    /**
+     * @param array<string, mixed> $attribs
+     * @return string
+     */
     public function __invoke($attribs)
     {
         return $this->html5Attribs($attribs);
     }
 
+    /**
+     * @param array<string, mixed> $attribs
+     * @return string
+     */
     public function html5Attribs($attribs)
     {
         $out = [];
@@ -22,8 +30,8 @@ class Html5Attribs extends Base
                 continue;
             } elseif (is_bool($value)) {
                 if ($value) $out[] = "$key";
-            } else {
-                $out[] = "$key=\"" . htmlspecialchars($value, ENT_COMPAT | ENT_HTML5) . "\"";
+            } elseif (is_string($value) || is_int($value) || is_float($value)) {
+                $out[] = "$key=\"" . htmlspecialchars((string) $value, ENT_COMPAT | ENT_HTML5) . "\"";
             }
         }
         return join(' ', $out);

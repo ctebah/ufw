@@ -2,7 +2,6 @@
 
 namespace Ufw\Middleware;
 
-use Laminas\Stratigility\Middleware\CallableMiddlewareDecorator;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -17,19 +16,16 @@ abstract class Base implements MiddlewareInterface
 {
 
     /**
-     *
-     * @var \Laminas\Diactoros\PhpInputStream
+     * @var \Laminas\Diactoros\PhpInputStream|null
      */
     protected static $phpInputStream = null;
 
     /**
-     *
-     * @var \Negotiation\Negotiator
+     * @var \Negotiation\Negotiator|null
      */
     protected static $negotiator = null;
 
     /**
-     *
      * @var \Ufw\Controller\Base
      */
     protected $controller;
@@ -39,18 +35,37 @@ abstract class Base implements MiddlewareInterface
         $this->setController($controller);
     }
 
-    public function __invoke(\Ufw\Request $request, callable $next)
+    /**
+     * @param callable(ServerRequestInterface): ResponseInterface $next
+     */
+    public function __invoke(\Ufw\Request $request, callable $next): ResponseInterface
     {
-        // TODO(legacy): Old double-pass `(request, callable $next)` entry point. `process()` expects
-        // `RequestHandlerInterface` as 2nd arg; `CallableMiddlewareDecorator` is `MiddlewareInterface` - the pipeline
-        // in {@see \Ufw\Controller\Base::processMiddlewares()} uses {@see process()} only, not this. Revisit if unused.
-        return $this->process($request, new CallableMiddlewareDecorator($next));
+        $handler = new class($next) implements RequestHandlerInterface {
+            /**
+             * @var callable(ServerRequestInterface): ResponseInterface
+             */
+            private $next;
+
+            /**
+             * @param callable(ServerRequestInterface): ResponseInterface $next
+             */
+            public function __construct(callable $next)
+            {
+                $this->next = $next;
+            }
+
+            public function handle(ServerRequestInterface $request): ResponseInterface
+            {
+                return ($this->next)($request);
+            }
+        };
+
+        return $this->process($request, $handler);
     }
 
     abstract public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface;
 
     /**
-     *
      * @return \Ufw\Response
      */
     protected function getResponse()
@@ -58,24 +73,29 @@ abstract class Base implements MiddlewareInterface
         return $this->getController()->getResponse();
     }
 
+    /**
+     * @return string
+     */
     protected function getPhpInput()
     {
-        if (!isset(self::$phpInputStream)) {
+        if (self::$phpInputStream === null) {
             self::$phpInputStream = new \Laminas\Diactoros\PhpInputStream();
         }
         return self::$phpInputStream->__toString();
     }
 
+    /**
+     * @return \Negotiation\Negotiator
+     */
     protected function getNegotiator()
     {
-        if (!isset(self::$negotiator)) {
+        if (self::$negotiator === null) {
             self::$negotiator = new \Negotiation\Negotiator();
         }
         return self::$negotiator;
     }
 
     /**
-     *
      * @return \Ufw\Application
      */
     protected function getApplication()
@@ -84,7 +104,6 @@ abstract class Base implements MiddlewareInterface
     }
 
     /**
-     *
      * @return \Ufw\Controller\Base
      */
     protected function getController()
@@ -92,15 +111,17 @@ abstract class Base implements MiddlewareInterface
         return $this->controller;
     }
 
+    /**
+     * @param string $name
+     * @return \Ufw\Helper\Base|null
+     */
     protected function getHelper($name)
     {
         return $this->getApplication()->getHelper($name);
     }
 
     /**
-     *
-     * @param
-     *            $controller
+     * @return $this
      */
     protected function setController(\Ufw\Controller\Base $controller)
     {

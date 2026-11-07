@@ -15,6 +15,10 @@ class Bootstrap3plain extends FormRenderHelperBase
 {
     protected $baseScriptPath = 'bootstrap3';
 
+    /**
+     * @param string|null $script
+     * @return string
+     */
     public function field(\Ufw\Form\Element\Base $element, $script = null)
     {
         if (!$script) {

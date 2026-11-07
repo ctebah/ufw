@@ -5,12 +5,17 @@ namespace Ufw\Form\Element;
 class Email extends Input
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'email';
 
+    /**
+     * @return $this
+     */
     public function init()
     {
-        parent::init();
         $this->addValidator('email');
-        return $this;
+        return parent::init();
     }
 }

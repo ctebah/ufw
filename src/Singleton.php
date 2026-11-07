@@ -7,6 +7,9 @@ namespace Ufw;
 trait Singleton
 {
 
+    /**
+     * @var array<string, static>
+     */
     protected static $_instance = array();
 
     /**
@@ -24,6 +27,7 @@ trait Singleton
             $ref = new \ReflectionClass($class_name);
             self::$_instance[$fingerprint] = $ref->newInstanceArgs($args);
         }
+
         return self::$_instance[$fingerprint];
     }
 

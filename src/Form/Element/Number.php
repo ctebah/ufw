@@ -5,8 +5,14 @@ namespace Ufw\Form\Element;
 class Number extends Input
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'number';
 
+    /**
+     * @var list<string>
+     */
     protected $defaultOptionsToAttribs = [
         'name',
         'id',

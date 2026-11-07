@@ -5,26 +5,20 @@ namespace Ufw\Form\Validator;
 class ReCaptcha extends Base
 {
 
-    // The secret parameter is missing.
     const MISSING_INPUT_SECRET = 'missing-input-secret';
 
-    // The secret parameter is invalid or malformed.
     const INVALID_INPUT_SECRET = 'invalid-input-secret';
 
-    // The response parameter is missing.
     const MISSING_INPUT_RESPONSE = 'missing-input-response';
 
-    // The response parameter is invalid or malformed.
     const INVALID_INPUT_RESPONSE = 'invalid-input-response';
 
-    // The request is invalid or malformed.
     const BAD_REQUEST = 'bad-request';
 
     const TIMEOUT_OR_DUPLICATE = 'timeout-or-duplicate';
 
     /**
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageTemplates = array(
         self::MISSING_INPUT_SECRET => "The secret parameter is missing.",
@@ -36,22 +30,18 @@ class ReCaptcha extends Base
     );
 
     /**
-     *
      * @var string
      */
     protected $secret;
 
     /**
-     *
      * @var string
      */
     protected $siteKey;
 
     /**
-     * Sets validator options
-     *
-     * @param array $options
-     *            Validator options
+     * @param string $secret
+     * @param string $siteKey
      */
     public function __construct($secret, $siteKey)
     {
@@ -59,45 +49,62 @@ class ReCaptcha extends Base
     }
 
     /**
-     *
-     * Returns true if and only if $value is contained in the haystack option.
-     *
      * @param mixed $value
-     * @return boolean
+     * @param array<string, mixed>|null $context
+     * @return bool
      */
     public function isValid($value, $context = null)
     {
-        if (is_null($value)) {
+        if ($value === null) {
             return false;
         }
-        
-        $client = new \GuzzleHttp\Client([
-            'base_uri' => 'https://www.google.com/recaptcha/api/siteverify'
-        ]);
+
+        $remoteip = null;
+        $request = $this->getApplication()->getRequest();
+        if ($request !== null) {
+            $params = $request->getServerParams();
+            $remoteip = $params['REMOTE_ADDR'] ?? null;
+        }
+
+        $client = $this->createSiteVerifyClient();
         $response = $client->post('', [
             'form_params' => [
                 'secret' => $this->getSecret(),
                 'response' => $value,
-                'remoteip' => @$this->getApplication()
-                    ->getRequest()
-                    ->getServerParams()['REMOTE_ADDR']
+                'remoteip' => $remoteip
             ]
         ]);
-        
+
         $json = json_decode($response->getBody() . '', true);
-        if ($json['success']) {
+        if (!is_array($json)) {
+            return false;
+        }
+        if (!empty($json['success'])) {
             return true;
         }
-        
-        foreach ($json['error-codes'] as $errCode) {
-            $this->error($errCode);
+
+        if (!empty($json['error-codes']) && is_array($json['error-codes'])) {
+            foreach ($json['error-codes'] as $errCode) {
+                if (is_string($errCode)) {
+                    $this->error($errCode);
+                }
+            }
         }
-        
+
         return false;
     }
 
     /**
-     *
+     * @return \GuzzleHttp\Client
+     */
+    protected function createSiteVerifyClient()
+    {
+        return new \GuzzleHttp\Client([
+            'base_uri' => 'https://www.google.com/recaptcha/api/siteverify',
+        ]);
+    }
+
+    /**
      * @return string
      */
     public function getSecret()
@@ -106,7 +113,6 @@ class ReCaptcha extends Base
     }
 
     /**
-     *
      * @return string
      */
     public function getSiteKey()
@@ -115,8 +121,8 @@ class ReCaptcha extends Base
     }
 
     /**
-     *
      * @param string $secret
+     * @return $this
      */
     public function setSecret($secret)
     {
@@ -125,8 +131,8 @@ class ReCaptcha extends Base
     }
 
     /**
-     *
      * @param string $siteKey
+     * @return $this
      */
     public function setSiteKey($siteKey)
     {

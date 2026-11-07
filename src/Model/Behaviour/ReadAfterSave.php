@@ -7,7 +7,13 @@ namespace Ufw\Model\Behaviour;
  */
 class ReadAfterSave extends Base
 {
+    public $order = 120;
 
+    /**
+     * @param mixed $success
+     * @param array<string, mixed> $opts
+     * @return $this
+     */
     public function afterSave($success, $opts = [])
     {
         if (!$success || !$this->getOwner()->getPrimaryKeyField()) {

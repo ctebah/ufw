@@ -14,17 +14,28 @@ class Application
     const URI_DELIMITER = '/';
 
     /**
-     *
-     * @var \Ufw\Controller\Base
+     * @var \Ufw\Controller\Base|null
      */
     protected $currentController = null;
 
+    /**
+     * @var array<string, mixed>|null
+     */
     protected static $config = null;
 
+    /**
+     * @var array<string, mixed>
+     */
     protected $dispatchDefaults = array();
 
+    /**
+     * @var list<string>
+     */
     protected $dispatchControllers = array();
 
+    /**
+     * @var array<string, \Ufw\Helper\Base>
+     */
     protected $helpersInstantiated = array();
 
     /**
@@ -35,13 +46,13 @@ class Application
 
     /**
      *
-     * @var \Ufw\Response
+     * @var \Ufw\Response|null
      */
     protected $response = null;
 
     /**
      *
-     * @var \Ufw\Router
+     * @var \Ufw\Router|null
      */
     protected $router;
 
@@ -49,33 +60,37 @@ class Application
     {
         Registry::getInstance()->set('application', $this);
         if (!$this->getConfig()) {
-            $this->setConfig(include Paths::application() . '/config/app.php');
+            $appConfig = include Paths::application() . '/config/app.php';
+            if (!is_array($appConfig)) {
+                throw new \RuntimeException('Application config must return an array.');
+            }
+            $this->setConfig($this->normalizeStringKeyedArray($appConfig));
         }
-        
-        if (isset($this->getConfig()['dispatch'])) {
-            if (isset($this->getConfig()['dispatch']['controllers'])) {
-                $this->setDispatchControllers($this->getConfig()['dispatch']['controllers']);
-            }
-            if (isset($this->getConfig()['dispatch']['defaults'])) {
-                $this->setDispatchDefaults($this->getConfig()['dispatch']['defaults']);
-            }
+
+        $dispatch = $this->getDispatchConfig();
+        if (isset($dispatch['controllers'])) {
+            $this->setDispatchControllers($this->normalizeStringList($dispatch['controllers']));
+        }
+        if (isset($dispatch['defaults'])) {
+            $this->setDispatchDefaults($this->normalizeStringKeyedArray($dispatch['defaults']));
         }
     }
 
+    /**
+     * @param \Ufw\Request|null $request
+     * @return $this
+     */
     public function run($request = null)
     {
         try {
             $this->dispatch($request);
         } catch (\Ufw\Exception\BreakExecution $e) {
             $statusCode = $this->getResponse()->getStatusCode();
-            if (($statusCode >= 300) && ($statusCode <= 310)) {
+            if ($this->shouldEmitAndTerminate($statusCode)) {
                 $this->getResponse()->emit();
-                die();
-            }
-            // HTTP Basic (etc.): keep WWW-Authenticate; do not run dispatchError - it would reset() and drop the header.
-            if ($statusCode === 401 && $this->getResponse()->hasHeader('WWW-Authenticate')) {
-                $this->getResponse()->emit();
-                die();
+                $this->terminateAfterEmit();
+
+                return $this;
             }
             $actions = [
                 400 => 'bad-request',
@@ -102,32 +117,76 @@ class Application
     }
 
     /**
+     * Redirects (3xx) and 401 with an existing WWW-Authenticate header: emit only, no error dispatch.
+     *
+     * @param int $statusCode
+     * @return bool
+     */
+    protected function shouldEmitAndTerminate($statusCode)
+    {
+        if ($statusCode >= 300 && $statusCode <= 310) {
+            return true;
+        }
+        if ($statusCode === 401 && $this->getResponse()->hasHeader('WWW-Authenticate')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Ends the request after {@see Response::emit()}. Tests may define UFW_APPLICATION_SUPPRESS_EXIT.
+     *
+     * @return void
+     */
+    protected function terminateAfterEmit()
+    {
+        if (defined('UFW_APPLICATION_SUPPRESS_EXIT') && UFW_APPLICATION_SUPPRESS_EXIT) {
+            return;
+        }
+        die();
+    }
+
+    /**
      *
      * @param string $name
-     * @param \Ufw\Controller\Base $controller
-     * @return \Ufw\Helper\Base
+     * @param \Ufw\Controller\Base|null $controller
+     * @return \Ufw\Helper\Base|null
      */
     public function getHelper($name, $controller = null)
     {
+        $helper = null;
         $name = ucfirst($name);
         if (isset($this->helpersInstantiated[$name])) {
             $helper = $this->helpersInstantiated[$name];
         } elseif (class_exists("\\Helper\\$name")) {
             $className = "\\Helper\\$name";
-            $this->helpersInstantiated[$name] = $helper = new $className();
+            if (is_subclass_of($className, \Ufw\Helper\Base::class)) {
+                $this->helpersInstantiated[$name] = $helper = new $className();
+            }
         } elseif (class_exists("\\Ufw\\Helper\\$name")) {
             $className = "\\Ufw\\Helper\\$name";
-            $this->helpersInstantiated[$name] = $helper = new $className();
+            if (is_subclass_of($className, \Ufw\Helper\Base::class)) {
+                $this->helpersInstantiated[$name] = $helper = new $className();
+            }
         }
-        if ($helper && $controller) {
+        if ($helper !== null && $controller) {
             $helper->setController($controller);
         }
         return $helper;
     }
 
+    /**
+     * @param \Ufw\Request|null $request
+     * @return $this
+     */
     public function dispatch($request = null)
     {
         $this->setRequest($request ? $request : $this->decodeRequest());
+        $activeRequest = $this->getRequest();
+        if ($activeRequest === null) {
+            throw new \RuntimeException('Dispatch requires a request.');
+        }
         
         if (!$request && $this->getRouter()->getCurrentRoute()) {
             $controllerClass = $this->getRouter()->getCurrentRoute()->getControllerClass();
@@ -138,10 +197,10 @@ class Application
         } else {
             // explicitly set request
             $toInstance = $this->hasAction(
-                $this->getRequest()->getController(),
-                $this->getRequest()->getAction(),
-                $this->getRequest()->getMethod(),
-                $this->getRequest()->getModule()
+                $activeRequest->getController(),
+                $activeRequest->getAction(),
+                $activeRequest->getMethod(),
+                $activeRequest->getModule()
             );
             
             if (!$toInstance) {
@@ -157,6 +216,14 @@ class Application
             }
             
             $actionName = $toInstance['action'];
+        }
+
+        if (!is_string($actionName) || $actionName === '') {
+            throw new \Ufw\Exception\BreakExecution('Method Not Allowed', 405);
+        }
+        
+        if (!$controller instanceof \Ufw\Controller\Base) {
+            throw new \RuntimeException('Controller must extend \\Ufw\\Controller\\Base.');
         }
         
         $this->setCurrentController($controller);
@@ -236,12 +303,12 @@ class Application
             }
 
             $requestUri = $req->getServer('REQUEST_URI');
-            if ($requestUri !== null && $requestUri !== '') {
+            if (is_string($requestUri) && $requestUri !== '') {
                 $lines[] = 'REQUEST_URI: ' . $requestUri;
             }
 
             $q = $req->getQueryParams();
-            if (is_array($q) && $q !== []) {
+            if ($q !== []) {
                 $lines[] = 'Query: ' . http_build_query($q, '', '&', PHP_QUERY_RFC3986);
             }
 
@@ -253,9 +320,9 @@ class Application
                 || ($action !== null && $action !== '')) {
                 $lines[] = sprintf(
                     'Dispatch: module=%s controller=%s action=%s',
-                    $module !== null ? (string) $module : '',
-                    $controller !== null ? (string) $controller : '',
-                    $action !== null ? (string) $action : ''
+                    self::scalarToString($module),
+                    self::scalarToString($controller),
+                    self::scalarToString($action)
                 );
             }
 
@@ -265,7 +332,7 @@ class Application
             }
 
             $ip = $req->getServer('REMOTE_ADDR');
-            if ($ip !== null && $ip !== '') {
+            if (is_string($ip) && $ip !== '') {
                 $lines[] = 'Client: ' . $ip;
             }
 
@@ -285,19 +352,27 @@ class Application
     /**
      * When {@see decodeRequest()} throws before {@see setRequest()}, only PHP superglobals describe the hit URL.
      */
+    /**
+     * @return list<string>
+     */
     protected function buildRequestContextLinesFromGlobals(): array
     {
         $lines = [];
-        if (!isset($_SERVER) || !is_array($_SERVER)) {
-            $lines[] = 'Request: (no Ufw request object; $_SERVER not available)';
-            return $lines;
-        }
+        $server = $_SERVER;
 
-        $method = isset($_SERVER['REQUEST_METHOD']) ? (string) $_SERVER['REQUEST_METHOD'] : '?';
-        $requestUri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
-        $host = isset($_SERVER['HTTP_HOST']) ? (string) $_SERVER['HTTP_HOST'] : (isset($_SERVER['SERVER_NAME']) ? (string) $_SERVER['SERVER_NAME'] : '');
-        $https = $_SERVER['HTTPS'] ?? '';
-        $scheme = ($https !== '' && strtolower((string) $https) !== 'off') ? 'https' : 'http';
+        $method = '?';
+        if (isset($server['REQUEST_METHOD']) && is_string($server['REQUEST_METHOD'])) {
+            $method = $server['REQUEST_METHOD'];
+        }
+        $requestUri = isset($server['REQUEST_URI']) && is_string($server['REQUEST_URI']) ? $server['REQUEST_URI'] : '';
+        $host = '';
+        if (isset($server['HTTP_HOST']) && is_string($server['HTTP_HOST'])) {
+            $host = $server['HTTP_HOST'];
+        } elseif (isset($server['SERVER_NAME']) && is_string($server['SERVER_NAME'])) {
+            $host = $server['SERVER_NAME'];
+        }
+        $https = $server['HTTPS'] ?? '';
+        $scheme = (is_string($https) && $https !== '' && strtolower($https) !== 'off') ? 'https' : 'http';
 
         if ($host !== '' && $requestUri !== '') {
             $lines[] = 'Request: ' . $method . ' ' . $scheme . '://' . $host . $requestUri;
@@ -311,18 +386,18 @@ class Application
             $lines[] = 'REQUEST_URI: ' . $requestUri;
         }
 
-        if (!empty($_GET) && is_array($_GET)) {
+        if ($_GET !== []) {
             $lines[] = 'Query: ' . http_build_query($_GET, '', '&', PHP_QUERY_RFC3986);
         }
 
-        if (!empty($_SERVER['HTTP_REFERER'])) {
-            $lines[] = 'Referer: ' . (string) $_SERVER['HTTP_REFERER'];
+        if (!empty($server['HTTP_REFERER']) && is_string($server['HTTP_REFERER'])) {
+            $lines[] = 'Referer: ' . $server['HTTP_REFERER'];
         }
-        if (!empty($_SERVER['REMOTE_ADDR'])) {
-            $lines[] = 'Client: ' . (string) $_SERVER['REMOTE_ADDR'];
+        if (!empty($server['REMOTE_ADDR']) && is_string($server['REMOTE_ADDR'])) {
+            $lines[] = 'Client: ' . $server['REMOTE_ADDR'];
         }
-        if (!empty($_SERVER['HTTP_USER_AGENT'])) {
-            $ua = (string) $_SERVER['HTTP_USER_AGENT'];
+        if (!empty($server['HTTP_USER_AGENT']) && is_string($server['HTTP_USER_AGENT'])) {
+            $ua = $server['HTTP_USER_AGENT'];
             $lines[] = 'User-Agent: ' . (strlen($ua) > 240 ? substr($ua, 0, 237) . '...' : $ua);
         }
 
@@ -331,16 +406,24 @@ class Application
         return $lines;
     }
 
+    /**
+     * @param string $action
+     * @param string $controller
+     * @return $this
+     */
     protected function dispatchError($action = 'not-found', $controller = 'error')
     {
         $prev = $this->getRequest();
-        $module = $prev ? $prev->getModule() : null;
+        $module = $prev !== null ? $prev->getModule() : null;
 
-        // Prefer the active Ufw request; if none or no PSR request (e.g. 404 before setRequest()), use globals so Accept is still visible.
-        $forNegotiation = ($prev && $prev->getServerRequest())
-            ? $prev->getServerRequest()
-            : \Laminas\Diactoros\ServerRequestFactory::fromGlobals();
-        if ($forNegotiation && Request::acceptPrefersApplicationJson($forNegotiation)) {
+        $forNegotiation = \Laminas\Diactoros\ServerRequestFactory::fromGlobals();
+        if ($prev !== null) {
+            $sr = $prev->getServerRequest();
+            if ($sr !== null) {
+                $forNegotiation = $sr;
+            }
+        }
+        if (Request::acceptPrefersApplicationJson($forNegotiation)) {
             $this->getResponse()->setFormat('json');
         }
 
@@ -349,13 +432,16 @@ class Application
             'action' => $action,
             'module' => $module,
         ];
-        if ($prev) {
+        if ($prev !== null) {
             $seed = array_merge($prev->getAttributes(), $seed);
         }
 
         return $this->dispatch(new Request($seed, [], $this->getDispatchDefaults($module), $prev));
     }
 
+    /**
+     * @return \Ufw\Request
+     */
     protected function decodeRequest()
     {
         $route = $this->getRouter()->match();
@@ -367,18 +453,31 @@ class Application
         throw new \Ufw\Exception\BreakExecution("Not found", 404);
     }
 
+    /**
+     * @param string|null $controllerName
+     * @param string|null $actionName
+     * @param string|null $httpMethod
+     * @param string|null $module
+     * @return array{controller: string, action: string|null, kind: string}|false
+     */
     protected function hasAction($controllerName, $actionName, $httpMethod = null, $module = null)
     {
-        if (!$controllerName) {
-            $controllerName = $this->getDispatchDefaults($module)['controller'];
+        $controllerName = (string) ($controllerName ?? '');
+        $actionName = (string) ($actionName ?? '');
+        if ($controllerName === '') {
+            $controllerName = self::scalarToString($this->getDispatchDefaults($module)['controller'] ?? null);
         }
+        $dispatch = $this->getDispatchConfig();
         if ($module) {
-            if (@$this->getConfig()['dispatch']['module'][$module]['controller_aliases'][$controllerName]) {
-                $controllerName = $this->getConfig()['dispatch']['module'][$module]['controller_aliases'][$controllerName];
+            $moduleDispatch = $this->getModuleDispatchConfig($dispatch, $module);
+            $aliases = $moduleDispatch['controller_aliases'] ?? [];
+            if (is_array($aliases) && isset($aliases[$controllerName]) && is_string($aliases[$controllerName])) {
+                $controllerName = $aliases[$controllerName];
             }
         } else {
-            if (@$this->getConfig()['dispatch']['controller_aliases'][$controllerName]) {
-                $controllerName = $this->getConfig()['dispatch']['controller_aliases'][$controllerName];
+            $aliases = $dispatch['controller_aliases'] ?? [];
+            if (is_array($aliases) && isset($aliases[$controllerName]) && is_string($aliases[$controllerName])) {
+                $controllerName = $aliases[$controllerName];
             }
         }
         
@@ -411,6 +510,9 @@ class Application
                 'kind' => $classKind
             ];
         } else {
+            if (!is_string($actionMethod) || $actionMethod === '') {
+                return false;
+            }
             try {
                 $method = new \ReflectionMethod($controllerClass, $actionMethod);
                 return $method->isPublic() ? [
@@ -432,8 +534,7 @@ class Application
     }
 
     /**
-     *
-     * @return Request
+     * @return \Ufw\Request|null
      */
     public function getRequest()
     {
@@ -441,8 +542,8 @@ class Application
     }
 
     /**
-     *
-     * @param request $request
+     * @param \Ufw\Request|null $request
+     * @return $this
      */
     public function setRequest($request)
     {
@@ -450,21 +551,28 @@ class Application
         return $this;
     }
 
+    /**
+     * @param string|null $module
+     * @return array<string, mixed>
+     */
     public function getDispatchDefaults($module = null)
     {
-        $global = $this->dispatchDefaults ?? [];
+        $global = $this->dispatchDefaults;
 
         if (!$module) {
             return $global;
         }
 
-        // Same key as getDispatchControllers() / hasAction(): dispatch.module[$name]
-        $dispatch = $this->getConfig()['dispatch'] ?? [];
-        $mod = ($dispatch['module'] ?? [])[$module] ?? [];
+        $mod = $this->getModuleDispatchConfig($this->getDispatchConfig(), $module);
+        $defaults = $mod['defaults'] ?? $global;
 
-        return $mod['defaults'] ?? $global;
+        return is_array($defaults) ? $this->normalizeStringKeyedArray($defaults) : $global;
     }
 
+    /**
+     * @param array<string, mixed> $dispatchDefaults
+     * @return $this
+     */
     public function setDispatchDefaults($dispatchDefaults)
     {
         $this->dispatchDefaults = $dispatchDefaults;
@@ -472,29 +580,32 @@ class Application
     }
 
     /**
-     *
-     * @return \Ufw\Controller\Base
+     * @return \Ufw\Controller\Base|null
      */
     public function getCurrentController()
     {
         return $this->currentController;
     }
 
+    /**
+     * @param string $action
+     * @return string
+     */
     public function getScriptName($action)
     {
-        $action = \Ufw\Utils\Strings::getInstance()->formatToPhpFriendlyName($action, '');
-        return strtolower(preg_replace([
+        $action = \Ufw\Utils\Strings::getInstance()->formatToPhpFriendlyName((string) $action, '');
+        return strtolower((string) preg_replace([
             '~(?<=(?:[A-Z]))([A-Z]+)([A-Z][A-z])~',
             '~(?<=(?:[a-z0-9]))([A-Z])~'
         ], [
             '\1-\2',
             '-\1'
-        ], $action));
+        ], (string) $action));
     }
 
     /**
-     *
      * @param \Ufw\Controller\Base $currentController
+     * @return $this
      */
     public function setCurrentController($currentController)
     {
@@ -503,61 +614,61 @@ class Application
     }
 
     /**
-     *
-     * @return array
+     * @param string|null $module
+     * @return list<string>
      */
     public function getDispatchControllers($module = null)
     {
         if (!$module) {
             return $this->dispatchControllers;
         }
-        $dispatch = $this->getConfig()['dispatch'] ?? [];
-        $mod = ($dispatch['module'] ?? [])[$module] ?? [];
-        $list = $mod['controllers'] ?? [];
-        if (@is_array($mod['controller_aliases']) && $mod['controller_aliases'] !== []) {
-            $list = array_merge($list, array_keys($mod['controller_aliases']));
+        $mod = $this->getModuleDispatchConfig($this->getDispatchConfig(), $module);
+        $list = $this->normalizeStringList($mod['controllers'] ?? []);
+        $aliases = $mod['controller_aliases'] ?? [];
+        if (is_array($aliases) && $aliases !== []) {
+            $list = array_merge($list, array_keys($aliases));
         }
 
         return $list;
     }
 
     /**
-     *
-     * @param array $dispatchControllers
+     * @param list<string> $dispatchControllers
+     * @return $this
      */
     public function setDispatchControllers($dispatchControllers)
     {
         $this->dispatchControllers = $dispatchControllers;
-        if (@is_array($this->getConfig()['dispatch']['controller_aliases'])) {
-            $this->dispatchControllers = array_merge($this->dispatchControllers, array_keys($this->getConfig()['dispatch']['controller_aliases']));
+        $dispatch = $this->getDispatchConfig();
+        $aliases = $dispatch['controller_aliases'] ?? null;
+        if (is_array($aliases)) {
+            $this->dispatchControllers = array_merge($this->dispatchControllers, array_keys($aliases));
         }
         return $this;
     }
 
     /**
-     *
-     * @return response
+     * @return \Ufw\Response
      */
     public function getResponse()
     {
-        if (!isset($this->response)) {
+        if ($this->response === null) {
             $this->response = new Response();
         }
         return $this->response;
     }
 
     /**
-     *
-     * @return array
+     * @return array<string, mixed>|null
      */
-    public function getConfig()
+    public static function getConfig()
     {
         return static::$config;
     }
 
     /**
-     *
-     * @param array $config
+     * @param array<string, mixed> $config
+     * @return $this
      */
     public function setConfig(array $config)
     {
@@ -571,20 +682,118 @@ class Application
      */
     public function getRouter()
     {
-        if (!isset($this->router)) {
+        if ($this->router === null) {
             $request = new Request([], [], []);
-            $this->router = new Router($this, $request, $this->getConfig()['dispatch']['routes']);
+            $dispatch = $this->getDispatchConfig();
+            $routes = $dispatch['routes'] ?? [];
+            if (!is_array($routes)) {
+                $routes = [];
+            }
+            $routeDefinitions = [];
+            foreach ($routes as $routeName => $routeDef) {
+                if (is_string($routeName) && is_array($routeDef)) {
+                    $routeDefinitions[$routeName] = $this->normalizeStringKeyedArray($routeDef);
+                }
+            }
+            $this->router = new Router($this, $request, $routeDefinitions);
         }
         return $this->router;
     }
 
     /**
-     *
      * @param \Ufw\Router $router
+     * @return $this
      */
     public function setRouter($router)
     {
         $this->router = $router;
         return $this;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function getDispatchConfig()
+    {
+        $config = $this->getConfig() ?? [];
+        $dispatch = $config['dispatch'] ?? [];
+
+        return is_array($dispatch) ? $this->normalizeStringKeyedArray($dispatch) : [];
+    }
+
+    /**
+     * @param array<string, mixed> $dispatch
+     * @param string $module
+     * @return array<string, mixed>
+     */
+    protected function getModuleDispatchConfig(array $dispatch, $module)
+    {
+        $modules = $dispatch['module'] ?? [];
+        if (!is_array($modules)) {
+            return [];
+        }
+        $mod = $modules[$module] ?? [];
+
+        return is_array($mod) ? $this->normalizeStringKeyedArray($mod) : [];
+    }
+
+    /**
+     * @param mixed $value
+     * @return list<string>
+     */
+    protected function normalizeStringList($value)
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+        $list = [];
+        foreach ($value as $item) {
+            if (is_string($item)) {
+                $list[] = $item;
+            }
+        }
+
+        return $list;
+    }
+
+    /**
+     * @param mixed $value
+     * @return string
+     */
+    protected static function scalarToString($value)
+    {
+        if ($value === null) {
+            return '';
+        }
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        return '';
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    protected function normalizeStringKeyedArray($value)
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+        $out = [];
+        foreach ($value as $key => $val) {
+            if (is_string($key)) {
+                $out[$key] = $val;
+            }
+        }
+
+        return $out;
     }
 }

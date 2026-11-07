@@ -1,5 +1,12 @@
 # UFW
 
+[![CI](https://github.com/ctebah/ufw/actions/workflows/ci.yml/badge.svg)](https://github.com/ctebah/ufw/actions/workflows/ci.yml)
+[![PHP](https://img.shields.io/badge/PHP-%3E%3D7.4-777BB4?logo=php&logoColor=white)](composer.json)
+[![PHPUnit](https://img.shields.io/badge/PHPUnit-11-533B74?logo=phpunit&logoColor=white)](docs/testing.md)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%2010-00A4EF)](phpstan.neon.dist)
+[![codecov](https://codecov.io/gh/ctebah/ufw/graph/badge.svg)](https://codecov.io/gh/ctebah/ufw)
+[![License](https://img.shields.io/badge/License-0BSD-blue.svg)](LICENSE)
+
 **μfw** is short for micro framework - that is the real name; UFW is the ASCII spelling so nobody has to chase `μ` on the keyboard. A compact PHP stack for people who still like PHP, and for people who must use it even if they do not love it.
 
 **AI-assisted development:** intent-first guides, [AGENTS.md](AGENTS.md), and working demos in [ufw-extras](https://github.com/ctebah/ufw-extras) — see the [Evaluation FAQ on coding assistants](docs/evaluation-faq.md#does-the-codebase-work-well-with-ai-coding-assistants-cursor-claude-copilot-).
@@ -43,6 +50,7 @@
 | [Security](docs/security.md) · [SECURITY.md](SECURITY.md) | Deployment checklist and vulnerability reporting. |
 | [Contributing](CONTRIBUTING.md) | PR style, scope rules, local checks. |
 | [Changelog](CHANGELOG.md) | Full history of releases and changes. |
+| [Migration: 1.0 → 1.1](docs/migration-1.0-to-1.1.md) | Upgrading existing apps: opt-in breaks and 1.0 parity. |
 | [License](LICENSE) | 0BSD |
 
 ## Install

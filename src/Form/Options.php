@@ -7,13 +7,18 @@ namespace Ufw\Form;
 trait Options {
 
     /**
-     *
-     * @var \Ufw\Form\Collection
+     * @var \Ufw\Form\Collection|null
      */
     protected $options = null;
 
+    /**
+     * @var list<string>
+     */
     protected $optionsToAttribs = [];
 
+    /**
+     * @var list<string>
+     */
     protected static $translatableOptions = [
         'label',
         'caption',
@@ -21,42 +26,57 @@ trait Options {
     ];
 
     /**
-     *
      * @return \Ufw\Form\Collection
      */
     protected function options()
     {
-        if (!isset($this->options)) {
+        if ($this->options === null) {
             $this->options = new Collection();
         }
         return $this->options;
     }
 
+    /**
+     * @param string $name
+     * @return mixed
+     */
     public function getOption($name)
     {
         $out = $this->options()->get($name);
-        return $out && in_array($name, static::$translatableOptions) ? $this->translate($out) : $out;
+        return $out && in_array($name, static::$translatableOptions, true) ? $this->translate($out) : $out;
     }
 
+    /**
+     * @param string $name
+     * @param mixed $value
+     * @return $this
+     */
     public function setOption($name, $value)
     {
         $this->options()->set($name, $value);
         return $this;
     }
 
+    /**
+     * @param string $name
+     * @return bool
+     */
     public function hasOption($name)
     {
         return $this->options()->has($name);
     }
 
+    /**
+     * @param string $name
+     * @return mixed
+     */
     public function removeOption($name)
     {
         return $this->options()->remove($name);
     }
 
     /**
-     *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getOptions()
     {
@@ -68,42 +88,50 @@ trait Options {
     }
 
     /**
-     *
-     * @param array $options
+     * @param array<string, mixed>|null $options
+     * @return $this
      */
     public function setOptions($options)
     {
-        if (method_exists($this, 'setAttrib')) {
-            if (!isset($options['attribs'])) {
-                $options['attribs'] = array();
+        if ($options === null) {
+            return $this;
+        }
+        $mergedAttribs = $this->getAttribs();
+        if (isset($options['attribs']) && is_array($options['attribs'])) {
+            foreach ($options['attribs'] as $attribKey => $attribValue) {
+                if (is_string($attribKey) && !array_key_exists($attribKey, $mergedAttribs)) {
+                    $mergedAttribs[$attribKey] = $attribValue;
+                }
             }
-            $options['attribs'] += $this->getAttribs();
-            foreach ($options as $key => $value) {
-                if ($key == 'attribs')
-                    continue;
-                if (in_array($key, $this->optionsToAttribs)) {
-                    if (isset($value)) {
-                        $options['attribs'][$key] = $value;
-                        unset($options[$key]);
-                    }
-                } elseif (method_exists($this, 'set' . ucfirst($key))) {
-                    call_user_func(array(
-                        $this,
-                        'set' . ucfirst($key)
-                    ), $value);
+        }
+        $options['attribs'] = $mergedAttribs;
+        foreach ($options as $key => $value) {
+            if ($key == 'attribs') {
+                continue;
+            }
+            if (in_array($key, $this->optionsToAttribs, true)) {
+                if (isset($value)) {
+                    $options['attribs'][$key] = $value;
+                    unset($options[$key]);
+                }
+            } else {
+                $setter = 'set' . ucfirst($key);
+                if (method_exists($this, $setter)) {
+                    $this->$setter($value);
                     unset($options[$key]);
                 }
             }
-            $this->setAttribs($options['attribs']);
-            unset($options['attribs']);
         }
-        $this->options()->setAll($options);
+        $this->setAttribs($options['attribs']);
+        unset($options['attribs']);
+        foreach ($options as $key => $value) {
+            $this->options()->set((string) $key, $value);
+        }
         return $this;
     }
 
     /**
-     *
-     * @return array
+     * @return list<string>
      */
     public function getOptionsToAttribs()
     {
@@ -111,10 +139,10 @@ trait Options {
     }
 
     /**
-     *
-     * @param array $optionsToAttribs
+     * @param list<string> $optionsToAttribs
+     * @return $this
      */
-    public function setOptionsToAttribs($optionsToAttribs)
+    public function setOptionsToAttribs(array $optionsToAttribs)
     {
         $this->optionsToAttribs = $optionsToAttribs;
         return $this;

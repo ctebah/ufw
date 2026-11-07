@@ -9,14 +9,23 @@ namespace Ufw\Helper;
 class JsTranslate extends Base
 {
 
+    /**
+     * @param string $str
+     * @return string
+     */
     public function __invoke($str)
     {
         return $this->jsTranslate($str);
     }
     
+    /**
+     * @param string $str
+     * @return string
+     */
     public function jsTranslate($str)
     {
-        return json_encode($this->translate($str));
+        $encoded = json_encode($this->translate($str));
+        return $encoded === false ? '' : $encoded;
     }
     
 }

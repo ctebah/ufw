@@ -7,8 +7,14 @@ namespace Ufw\Form\Element;
 abstract class Multi extends Base
 {
 
+    /**
+     * @var array<int|string, mixed>
+     */
     protected $multiOptions = array();
 
+    /**
+     * @return $this
+     */
     public function init()
     {
         $this->addValidator('inArray', [
@@ -16,30 +22,29 @@ abstract class Multi extends Base
                 'haystack' => $this->getMultiOptionValues()
             ]
         ]);
-        parent::init();
-        return $this;
+        return parent::init();
     }
 
+    /**
+     * @return list<int|string>
+     */
     public function getMultiOptionValues()
     {
         return array_keys($this->multiOptions);
     }
 
     /**
-     * Retrieve options array
-     *
-     * @return array
+     * @return array<int|string, mixed>
      */
     public function getMultiOptions()
     {
-        return $this->translate($this->multiOptions);
+        $options = $this->translate($this->multiOptions);
+        return is_array($options) ? $options : $this->multiOptions;
     }
 
     /**
-     * Set all options at once (overwrites)
-     *
-     * @param array $options
-     * @return \Ufw\Form\Element\Multi
+     * @param array<int|string, mixed> $options
+     * @return $this
      */
     public function setMultiOptions(array $options)
     {
@@ -48,15 +53,17 @@ abstract class Multi extends Base
     }
 
     /**
-     * Add many options at once
-     *
-     * @param array $options
+     * @param array<int|string, mixed> $options
+     * @return $this
      */
     public function addMultiOptions(array $options)
     {
         foreach ($options as $option => $value) {
             if (is_array($value) && array_key_exists('key', $value) && array_key_exists('value', $value)) {
-                $this->addMultiOption($value['key'], $value['value']);
+                $optionKey = $value['key'];
+                if (is_int($optionKey) || is_string($optionKey)) {
+                    $this->addMultiOption($optionKey, $value['value']);
+                }
             } else {
                 $this->addMultiOption($option, $value);
             }
@@ -65,10 +72,9 @@ abstract class Multi extends Base
     }
 
     /**
-     * Add an option
-     *
-     * @param string $option
-     * @param string $value
+     * @param string|int $option
+     * @param mixed $value
+     * @return $this
      */
     public function addMultiOption($option, $value = '')
     {
@@ -78,7 +84,7 @@ abstract class Multi extends Base
     }
 
     /**
-     * Clear all options
+     * @return $this
      */
     public function clearMultiOptions()
     {

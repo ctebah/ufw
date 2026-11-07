@@ -12,20 +12,25 @@ abstract class Base
      */
     protected $application;
 
+    /**
+     * @var bool
+     */
     protected $inited = false;
 
     /**
-     *
-     * @var array
+     * @var array<string, mixed>|null
      */
     protected $data = null;
 
     /**
-     *
-     * @var string
+     * @var string|null
      */
     protected $compiled = null;
 
+    /**
+     * @param array<string, mixed> $data
+     * @return $this
+     */
     public function init($data)
     {
         $this->setData($data)->setInited(true);
@@ -40,20 +45,21 @@ abstract class Base
         return $this->getCompiled();
     }
 
+    /**
+     * @return bool
+     */
     public function isInitialized()
     {
         return $this->getInited();
     }
 
     /**
-     *
      * @return string
      */
     abstract protected function getCompiled();
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     protected function getInited()
     {
@@ -61,8 +67,8 @@ abstract class Base
     }
 
     /**
-     *
-     * @param boolean $inited
+     * @param bool $inited
+     * @return $this
      */
     protected function setInited($inited)
     {
@@ -71,8 +77,7 @@ abstract class Base
     }
 
     /**
-     *
-     * @return array
+     * @return array<string, mixed>|null
      */
     public function getData()
     {
@@ -80,8 +85,8 @@ abstract class Base
     }
 
     /**
-     *
-     * @param array $data
+     * @param array<string, mixed>|null $data
+     * @return $this
      */
     protected function setData($data = null)
     {
@@ -91,7 +96,6 @@ abstract class Base
     }
 
     /**
-     *
      * @return \Ufw\Application
      */
     public function getApplication()
@@ -100,12 +104,24 @@ abstract class Base
     }
     
     /**
-     *
      * @param \Ufw\Application $application
+     * @return $this
      */
     public function setApplication($application)
     {
         $this->application = $application;
         return $this;
+    }
+
+    /**
+     * @return \Ufw\Helper\Html5Tag
+     */
+    protected function getHtml5TagHelper()
+    {
+        $helper = $this->getApplication()->getHelper('html5Tag');
+        if (!$helper instanceof \Ufw\Helper\Html5Tag) {
+            throw new \RuntimeException('html5Tag helper is not available');
+        }
+        return $helper;
     }
 }

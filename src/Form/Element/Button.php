@@ -5,10 +5,19 @@ namespace Ufw\Form\Element;
 class Button extends Base
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'submit';
 
+    /**
+     * @var bool
+     */
     protected $ignore = true;
 
+    /**
+     * @var string
+     */
     protected $renderScriptPath = 'form/button.php';
 
 }

@@ -13,33 +13,22 @@ class ServerRequest extends \Laminas\Diactoros\ServerRequest
 {
 
     /**
-     *
-     * @var array
+     * @var array<string, mixed>
      */
     protected $attributes = [];
 
     /**
-     *
-     * @param array $serverParams
-     *            Server parameters, typically from $_SERVER
-     * @param array $uploadedFiles
-     *            Upload file information, a tree of UploadedFiles
-     * @param null|string|UriInterface $uri
-     *            URI for the request, if any.
-     * @param null|string $method
-     *            HTTP method for the request, if any.
-     * @param string|resource|StreamInterface $body
-     *            Message body, if any.
-     * @param array $headers
-     *            Headers for the message, if any.
-     * @param array $cookies
-     *            Cookies for the message, if any.
-     * @param array $queryParams
-     *            Query params for the message, if any.
-     * @param null|array|object $parsedBody
-     *            The deserialized body parameters, if any.
-     * @param string $protocol
-     *            HTTP protocol version.
+     * @param array<string, mixed>|array<int|string, mixed> $serverParams Server parameters, typically from $_SERVER
+     * @param array<string, mixed>|array<int|string, mixed> $uploadedFiles Upload file information, a tree of UploadedFiles
+     * @param null|string|UriInterface $uri URI for the request, if any.
+     * @param null|string $method HTTP method for the request, if any.
+     * @param string|resource|StreamInterface $body Message body, if any.
+     * @param array<string, mixed> $headers Headers for the message, if any.
+     * @param array<int|string, mixed> $cookies Cookies for the message, if any.
+     * @param array<int|string, mixed> $queryParams Query params for the message, if any.
+     * @param null|array<int|string, mixed>|object $parsedBody The deserialized body parameters, if any.
+     * @param string $protocol HTTP protocol version.
+     * @param array<string, mixed> $attributes
      * @throws InvalidArgumentException for any invalid value.
      */
     public function __construct(
@@ -60,9 +49,8 @@ class ServerRequest extends \Laminas\Diactoros\ServerRequest
     }
 
     /**
-     * Recursively validate the structure in an uploaded files array.
-     *
-     * @param array $uploadedFiles
+     * @param array<int|string, mixed> $uploadedFiles
+     * @return void
      * @throws InvalidArgumentException if any leaf is not an UploadedFileInterface instance.
      */
     protected function validateUploadedFiles(array $uploadedFiles)
@@ -79,11 +67,18 @@ class ServerRequest extends \Laminas\Diactoros\ServerRequest
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getAttributes(): array
     {
         return $this->attributes;
     }
-    
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return $this
+     */
     public function setAttributes($attributes) {
         $this->attributes = $attributes;
         return $this;
@@ -110,5 +105,46 @@ class ServerRequest extends \Laminas\Diactoros\ServerRequest
         $new = clone $this;
         unset($new->attributes[$attribute]);
         return $new;
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
+    public function getCookieParams(): array
+    {
+        return parent::getCookieParams();
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
+    public function getQueryParams(): array
+    {
+        return parent::getQueryParams();
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
+    public function getServerParams(): array
+    {
+        return parent::getServerParams();
+    }
+
+    /**
+     * @return array<int|string, mixed>
+     */
+    public function getUploadedFiles(): array
+    {
+        return parent::getUploadedFiles();
+    }
+
+    /**
+     * @return array<int|string, mixed>|object|null
+     */
+    #[\ReturnTypeWillChange]
+    public function getParsedBody()
+    {
+        return parent::getParsedBody();
     }
 }

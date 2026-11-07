@@ -47,7 +47,10 @@ class Paths
         }
 
         if (\defined('APPLICATION_PATH')) {
-            return (string) \constant('APPLICATION_PATH');
+            $path = \constant('APPLICATION_PATH');
+            if (is_string($path) && $path !== '') {
+                return $path;
+            }
         }
 
         throw new \RuntimeException(
@@ -56,16 +59,7 @@ class Paths
     }
 
     /**
-     * Absolute path for file-based exception logging, or null when disabled.
-     *
-     * Reads <code>$appConfig['logging']['exception_log_path']</code> (same shape as <code>config/app.php</code>):
-     *
-     * - Key omitted or <code>$appConfig</code> not an array → <code>application() . '/log/exceptions.txt'</code>.
-     * - <code>false</code> or empty string (after trim) → null (no file log).
-     * - Absolute path → used as-is (Unix <code>/…</code>, Windows drive or UNC).
-     * - Relative path → under {@see application()}.
-     *
-     * @param array|null $appConfig Full application config array, or null when unavailable.
+     * @param array<string, mixed>|null $appConfig Full application config array, or null when unavailable.
      * @return string|null
      */
     public static function exceptionLogFilePath($appConfig = null)

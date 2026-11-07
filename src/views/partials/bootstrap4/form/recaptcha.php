@@ -6,11 +6,14 @@
 
     $errors = $element->getErrors();
     $hasErrors = !!$errors;
-    $hasSuccess = @strlen($element->getValue()) && !$hasErrors && $element->getForm()->getValidated();
+    $elementValue = $element->getValue();
+    $hasSuccess = is_string($elementValue) && $elementValue !== '' && !$hasErrors && ($form = $element->getForm()) !== null && $form->getValidated();
+    $inputName = $element->getAttrib('name');
+    $inputName = is_string($inputName) ? $inputName : '';
 ?>
 <div class="form-group <?php echo $element->getWrapClass() . ' ', $element->isRequired() ? 'required ' : '', $hasSuccess ? 'has-success ' : '', $hasErrors ? 'has-error ' : '', $hasErrors || $hasSuccess ? 'has-feedback ' : ''; ?>">
     <div id="<?php echo $element->getId(); ?>-visual" data-sitekey="" data-callback="recaptchaCallback"></div>
-    <input id="<?php echo $element->getId(); ?>" name="<?php echo $element->getAttrib('name'); ?>" value="" required tabindex="-1" style="width:50px; height:0; opacity:0; pointer-events:none; position:absolute; bottom:0;">
+    <input id="<?php echo $element->getId(); ?>" name="<?php echo $inputName; ?>" value="" required tabindex="-1" style="width:50px; height:0; opacity:0; pointer-events:none; position:absolute; bottom:0;">
     <?php if ($hasErrors): ?>
         <span class="glyphicon glyphicon-remove form-control-feedback" aria-hidden="true"></span>
         <span id="<?php echo $element->getId(); ?>-errors" class="form-text text-muted"><?php echo join('<br>', $errors); ?></span>
@@ -48,7 +51,7 @@
 
     $(document).one('grecaptcha.loaded', function() {
         grecaptcha.render(inputId + '-visual', {
-            sitekey: '<?php echo $element->getOption('site_key'); ?>',
+            sitekey: '<?php $siteKey = $element->getOption('site_key'); echo is_string($siteKey) ? $siteKey : ''; ?>',
             size: 'normal',
             tabindex: 0,
             callback: recaptchaCallback,

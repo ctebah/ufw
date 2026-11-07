@@ -5,8 +5,14 @@ namespace Ufw\Form\Element;
 class Textarea extends Base
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'textarea';
 
+    /**
+     * @var list<string>
+     */
     protected $defaultOptionsToAttribs = [
         'name',
         'id',
@@ -24,5 +30,8 @@ class Textarea extends Base
         'disabled'
     ];
 
+    /**
+     * @var string
+     */
     protected $renderScriptPath = 'form/textarea.php';
 }

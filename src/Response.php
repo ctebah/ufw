@@ -18,7 +18,7 @@ class Response implements ResponseInterface
     private const JSON_ENCODE_FLAGS = JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES
         | JSON_UNESCAPED_UNICODE;
 
-    /** @var \Laminas\Diactoros\Response */
+    /** @var ResponseInterface|null */
     protected $innerResponse = null;
 
     /** @var mixed */
@@ -35,11 +35,15 @@ class Response implements ResponseInterface
      */
     protected static $formatHandlers = null;
 
-    public function __construct($request = null)
+    public function __construct()
     {
         $this->reset(200);
     }
 
+    /**
+     * @param int $statusCode
+     * @return $this
+     */
     public function reset($statusCode = 200)
     {
         $this->provisionalResponse = new \Laminas\Diactoros\Response('php://memory', $statusCode, []);
@@ -143,6 +147,9 @@ class Response implements ResponseInterface
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     public function emit()
     {
         $this->buildInnerResponseObject();
@@ -164,11 +171,17 @@ class Response implements ResponseInterface
         self::$formatHandlers[$format] = $handler;
     }
 
+    /**
+     * @return bool
+     */
     public function mayHaveHtmlLayout()
     {
         return $this->shouldRenderViewScript() && !$this->getRequest()->isXmlHttpRequest();
     }
 
+    /**
+     * @return bool
+     */
     public function shouldRenderViewScript()
     {
         return in_array($this->getFormat(), [
@@ -177,17 +190,25 @@ class Response implements ResponseInterface
     }
 
     /**
-     * @return \Laminas\Diactoros\Response
+     * @return ResponseInterface
      */
     public function getInnerResponse()
     {
+        if ($this->innerResponse === null) {
+            $this->buildInnerResponseObject();
+        }
+        if (!($this->innerResponse instanceof ResponseInterface)) {
+            throw new \RuntimeException('Response format handler did not produce a response.');
+        }
+
         return $this->innerResponse;
     }
 
     /**
-     * @param \Laminas\Diactoros\Response $innerResponse
+     * @param ResponseInterface $innerResponse
+     * @return $this
      */
-    public function setInnerResponse(\Laminas\Diactoros\Response $innerResponse)
+    public function setInnerResponse(ResponseInterface $innerResponse)
     {
         $this->innerResponse = $innerResponse;
 
@@ -204,6 +225,7 @@ class Response implements ResponseInterface
 
     /**
      * @param mixed $content
+     * @return $this
      */
     public function setContent($content)
     {
@@ -222,6 +244,7 @@ class Response implements ResponseInterface
 
     /**
      * @param string $format
+     * @return $this
      */
     public function setFormat($format)
     {
@@ -235,9 +258,16 @@ class Response implements ResponseInterface
      */
     public function getRequest()
     {
-        return \Ufw\Registry::getInstance()->get('application')->getRequest();
+        $request = \Ufw\Registry::getInstance()->getApplication()->getRequest();
+        if ($request === null) {
+            throw new \RuntimeException('Request is not available.');
+        }
+        return $request;
     }
 
+    /**
+     * @return $this
+     */
     protected function buildInnerResponseObject()
     {
         $handlers = self::handlers();
@@ -263,16 +293,25 @@ class Response implements ResponseInterface
         return self::$formatHandlers;
     }
 
+    /**
+     * @param mixed $content
+     */
     private static function defaultHtmlHandler($content, self $response): ResponseInterface
     {
-        return new HtmlResponse((string) $content, $response->getStatusCode(), $response->getHeaders());
+        return new HtmlResponse(self::stringifyResponseContent($content), $response->getStatusCode(), $response->getHeaders());
     }
 
+    /**
+     * @param mixed $content
+     */
     private static function defaultJsonHandler($content, self $response): ResponseInterface
     {
         return new JsonResponse($content, $response->getStatusCode(), $response->getHeaders(), self::JSON_ENCODE_FLAGS);
     }
 
+    /**
+     * @param mixed $content
+     */
     private static function defaultRawHandler($content, self $response): ResponseInterface
     {
         $c = $response->getContent();
@@ -280,8 +319,25 @@ class Response implements ResponseInterface
             return $response->getProvisionalResponse();
         }
         $stream = new Stream('php://temp', 'wb+');
-        $stream->write((string) $c);
+        $stream->write(self::stringifyResponseContent($c));
 
         return $response->getProvisionalResponse()->withBody($stream);
+    }
+
+    /**
+     * @param mixed $content
+     */
+    private static function stringifyResponseContent($content): string
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+        if (is_int($content) || is_float($content)) {
+            return (string) $content;
+        }
+        if (is_object($content) && method_exists($content, '__toString')) {
+            return (string) $content;
+        }
+        return '';
     }
 }

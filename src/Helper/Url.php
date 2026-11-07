@@ -9,30 +9,61 @@ class Url extends Base
     protected const SCHEME_HTTP = 'http';
     protected const SCHEME_HTTPS = 'https';
 
+    /**
+     * @param array<int|string, mixed> $params
+     * @param bool $reset
+     * @param bool $withQS
+     * @param string|null $routeName
+     * @param bool $encode
+     * @return string
+     */
     public function __invoke($params = array(), $reset = true, $withQS = false, $routeName = 'default', $encode = true)
     {
         return $this->url($params, $reset, $withQS, $routeName, $encode);
     }
 
+    /**
+     * @param array<int|string, mixed> $params
+     * @param bool $reset
+     * @param bool $withQS
+     * @param string|null $routeName
+     * @param bool $encode
+     * @return string
+     */
     public function url($params = array(), $reset = true, $withQS = false, $routeName = 'default', $encode = true)
     {
-        /**
-         * @var \Ufw\Route\Base $route
-         */
-        $route = $routeName ?
-            $this->getApplication()->getRouter()->getRoute($routeName) :
-            $this->getApplication()->getRouter()->getCurrentRoute();
-        if (!$route) {
-            $route = $this->getApplication()->getRouter()->getRoute('default');
+        $router = $this->getApplication()->getRouter();
+        if ($routeName) {
+            $route = $router->getRoute($routeName);
+        } else {
+            $route = $router->getCurrentRoute();
+            if ($route === null) {
+                $route = $router->getRoute('default');
+            }
         }
-        return $route->buildUrl($params, $reset, $withQS, $encode);
+        $stringParams = array();
+        foreach ($params as $key => $value) {
+            $stringParams[(string) $key] = $value;
+        }
+        return $route->buildUrl($stringParams, $reset, $withQS, $encode);
     }
 
+    /**
+     * @param array<int|string, mixed> $params
+     * @param bool $reset
+     * @param bool $withQS
+     * @param string|null $routeName
+     * @param bool $encode
+     * @return string
+     */
     public function full($params = array(), $reset = true, $withQS = false, $routeName = null, $encode = true)
     {
         return $this->domain() . $this->url($params, $reset, $withQS, $routeName, $encode);
     }
     
+    /**
+     * @return string
+     */
     public function domain()
     {
         return $this->getScheme() . '://' . $this->getHttpHost();
@@ -43,7 +74,7 @@ class Url extends Base
      *
      * If no $key is passed, returns the entire $_SERVER array.
      *
-     * @param string $key
+     * @param string|null $key
      * @param mixed $default
      *            Default value to use if key not found
      * @return mixed Returns null if key does not exist
@@ -79,20 +110,22 @@ class Url extends Base
     protected function getHttpHost()
     {
         $host = $this->getServer('HTTP_HOST');
-        if (!empty($host)) {
+        if (is_string($host) && $host !== '') {
             return $host;
         }
-        
+
         $scheme = $this->getScheme();
         $name = $this->getServer('SERVER_NAME');
         $port = $this->getServer('SERVER_PORT');
-        
-        if (null === $name) {
+
+        if (!is_string($name)) {
             return '';
-        } elseif (($scheme == self::SCHEME_HTTP && $port == 80) || ($scheme == self::SCHEME_HTTPS && $port == 443)) {
-            return $name;
-        } else {
-            return $name . ':' . $port;
         }
+        $portNum = is_int($port) ? $port : (is_string($port) && ctype_digit($port) ? (int) $port : null);
+        if (($scheme == self::SCHEME_HTTP && $portNum === 80) || ($scheme == self::SCHEME_HTTPS && $portNum === 443) || $portNum === null) {
+            return $name;
+        }
+
+        return $name . ':' . (string) $portNum;
     }
 }

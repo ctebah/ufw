@@ -6,11 +6,13 @@ namespace Ufw\Component\ApiClient\Base;
  */
 trait TraitW {
 
+    /**
+     * @return \Ufw\Component\ApiClient\Response|null
+     */
     abstract protected function _doWrite();
 
     /**
-     *
-     * @return \Ufw\Component\ApiClient\Base
+     * @return $this
      */
     public function write()
     {

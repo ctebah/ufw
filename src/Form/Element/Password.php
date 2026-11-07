@@ -5,7 +5,13 @@ namespace Ufw\Form\Element;
 class Password extends Input
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'password';
-    
+
+    /**
+     * @var string
+     */
     protected $renderScriptPath = 'form/password.php';
 }

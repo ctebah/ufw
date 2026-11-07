@@ -7,10 +7,12 @@ echo $this->partial('ufw-form-check-icon-styles-once.php');
 
     $errors = $element->getErrors();
     $hasErrors = !!$errors;
-    $hasSuccess = @strlen($element->getValue()) && !$hasErrors && $element->getForm()->getValidated();
+    $elementValue = $element->getValue();
+    $hasSuccess = is_string($elementValue) && $elementValue !== '' && !$hasErrors && ($form = $element->getForm()) !== null && $form->getValidated();
 
     $attribs = $element->getAttribs();
-    $baseClass = $attribs['class'] ?? '';
+    $classAttrib = $attribs['class'] ?? '';
+    $baseClass = is_string($classAttrib) ? $classAttrib : '';
     if ($hasErrors) {
         $attribs['class'] = trim($baseClass . ' form-check-input is-invalid');
         $attribs['aria-describedby'] = $element->getId() . '-errors';

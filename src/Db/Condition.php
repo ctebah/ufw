@@ -16,28 +16,32 @@ class Condition extends Expression
 
     /**
      *
-     * @var int|string|int[]|string[]
+     * @var mixed
      */
     protected $value;
 
     /**
+     * Null until setOp(); getOp() then picks IS, =, or IN from the value.
      *
-     * @var string
+     * @var string|null
      */
     protected $op = null;
 
+    /**
+     * @param array<string, mixed>|\Ufw\Db\Expression $data
+     */
     public function __construct($data = array())
     {
         if ($data instanceof \Ufw\Db\Expression) {
             $this->_expression = (string)$data;
         } else {
-            if (array_key_exists('field', $data)) {
+            if (array_key_exists('field', $data) && is_string($data['field'])) {
                 $this->setField($data['field']);
             }
             if (array_key_exists('value', $data)) {
                 $this->setValue($data['value']);
             }
-            if (array_key_exists('op', $data)) {
+            if (array_key_exists('op', $data) && is_string($data['op'])) {
                 $this->setOp($data['op']);
             }
         }
@@ -49,10 +53,16 @@ class Condition extends Expression
             $this->getField() . ' ' . $this->getOp() . ' ' . $this->getOpenBracket() . $this->getValueQuoted(\Ufw\Db\Db::class) . $this->getCloseBracket();
     }
     
+    /**
+     * @return string
+     */
     protected function getCloseBracket() {
         return in_array(strtoupper(trim($this->getOp())), ['BETWEEN', 'IS', 'IS NOT', 'RLIKE', 'REGEXP']) ? '' : ')';
     }
 
+    /**
+     * @return string
+     */
     protected function getOpenBracket() {
         return in_array(strtoupper(trim($this->getOp())), ['BETWEEN', 'IS', 'IS NOT', 'RLIKE', 'REGEXP']) ? '' : '(';
     }
@@ -68,16 +78,30 @@ class Condition extends Expression
 
     /**
      *
-     * @return int|string|int[]|string[]
+     * @return mixed
      */
     public function getValue()
     {
         return $this->value;
     }
 
+    /**
+     * @param class-string<\Ufw\Db\Db> $quoter
+     * @return string
+     */
     public function getValueQuoted($quoter)
     {
-        return is_array($this->getValue()) ? join(', ', $quoter::quote($this->getValue())) : $quoter::quote($this->getValue());
+        $quoted = $quoter::quote($this->getValue());
+        if (is_array($quoted)) {
+            $parts = array();
+            foreach ($quoted as $part) {
+                if (is_int($part) || is_string($part)) {
+                    $parts[] = (string) $part;
+                }
+            }
+            return join(', ', $parts);
+        }
+        return (string) $quoted;
     }
 
     /**
@@ -95,6 +119,7 @@ class Condition extends Expression
     /**
      *
      * @param string $field
+     * @return void
      */
     public function setField($field)
     {
@@ -104,6 +129,7 @@ class Condition extends Expression
     /**
      *
      * @param mixed $value
+     * @return void
      */
     public function setValue($value)
     {
@@ -113,6 +139,7 @@ class Condition extends Expression
     /**
      *
      * @param string $op
+     * @return void
      */
     public function setOp($op)
     {

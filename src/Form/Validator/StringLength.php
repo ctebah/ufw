@@ -12,8 +12,7 @@ class StringLength extends Base
     const TOO_LONG = 'stringLengthTooLong';
 
     /**
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageTemplates = array(
         self::INVALID => "Invalid type given. String expected",
@@ -21,43 +20,65 @@ class StringLength extends Base
         self::TOO_LONG => "'%value%' is more than %max% characters long"
     );
 
+    /**
+     * @var int
+     */
     protected $maxLen = 255;
 
+    /**
+     * @var int|null
+     */
     protected $minLen = null;
 
+    /**
+     * @var array<string, string>
+     */
     protected $messageVariables = array(
         'max' => 'maxLen',
         'min' => 'minLen'
     );
 
+    /**
+     * @param int $maxLen
+     * @param int|null $minLen
+     */
     public function __construct($maxLen = 255, $minLen = null)
     {
         $this->setMaxLen($maxLen)->setMinLen($minLen);
     }
 
+    /**
+     * @param mixed $value
+     * @param array<string, mixed>|null $context
+     * @return bool
+     */
     public function isValid($value, $context = null)
     {
         $this->setValue($value);
-        
-        $length = isset($value) ? strlen(mb_convert_encoding($value, 'ISO-8859-1', 'UTF-8')) : 0;
-        
-        if ((null !== $this->getMaxLen()) && ($this->getMaxLen() < $length)) {
+
+        if (is_scalar($value)) {
+            $encoded = mb_convert_encoding((string) $value, 'ISO-8859-1', 'UTF-8');
+            $length = is_string($encoded) ? strlen($encoded) : strlen((string) $value);
+        } else {
+            $length = 0;
+        }
+
+        if ($this->getMaxLen() < $length) {
             $this->error(self::TOO_LONG);
         }
-        
-        if ((null !== $this->getMinLen()) && ($this->getMinLen() > $length)) {
+
+        if ($this->getMinLen() !== null && ($this->getMinLen() > $length)) {
             $this->error(self::TOO_SHORT);
         }
-        
+
         if (count($this->messages)) {
             return false;
-        } else {
-            return true;
         }
+
+        return true;
     }
 
     /**
-     *
      * @return int
      */
     public function getMaxLen()
@@ -66,18 +87,17 @@ class StringLength extends Base
     }
 
     /**
-     *
      * @param int $maxLen
+     * @return $this
      */
     public function setMaxLen($maxLen)
     {
-        $this->maxLen = $maxLen;
+        $this->maxLen = (int) $maxLen;
         return $this;
     }
 
     /**
-     *
-     * @return int
+     * @return int|null
      */
     public function getMinLen()
     {
@@ -85,12 +105,12 @@ class StringLength extends Base
     }
 
     /**
-     *
-     * @param int $maxLen
+     * @param int|null $minLen
+     * @return $this
      */
     public function setMinLen($minLen)
     {
-        $this->minLen = $minLen;
+        $this->minLen = $minLen === null ? null : (int) $minLen;
         return $this;
     }
 }

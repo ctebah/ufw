@@ -5,14 +5,17 @@ namespace Ufw\Form\Filter;
 abstract class Base
 {
 
+    /**
+     * @param mixed $value
+     * @return mixed
+     */
     abstract public function filter($value);
 
     /**
      * Key for {@see \Ufw\Form\Filters::addFilter()} when passing an instance.
-     * Same derivation as {@see \Ufw\Form\Validator\Base::getName()} (FQCN-style key).
      */
     public function getName(): string
     {
-        return trim(preg_replace('~\\\\~', '_', get_class($this)), '\\');
+        return trim((string) preg_replace('~\\\\~', '_', get_class($this)), '\\');
     }
 }

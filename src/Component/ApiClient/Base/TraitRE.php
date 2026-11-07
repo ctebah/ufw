@@ -8,8 +8,14 @@ trait TraitRE {
     
     use TraitR;
 
+    /**
+     * @var bool
+     */
     protected $hasErrors = false;
 
+    /**
+     * @return $this
+     */
     public function forget()
     {
         $this->hasErrors = false;
@@ -17,9 +23,8 @@ trait TraitRE {
     }
 
     /**
-     *
-     * @param boolean $reload
-     * @return \Ufw\Component\ApiClient\Base\R
+     * @param bool $reload
+     * @return $this
      */
     public function read($reload = false)
     {

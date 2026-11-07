@@ -3,32 +3,37 @@
 namespace Ufw;
 
 /**
- * UFW request: wraps {@see \Laminas\Diactoros\ServerRequest} with route defaults, attributes, and magic access to PSR-7 attributes.
+ * UFW request: wraps {@see \Ufw\ServerRequest} with route defaults, attributes, and magic access to PSR-7 attributes.
  *
- * @method string getController()
- * @method string getAction()
+ * @implements \ArrayAccess<string, mixed>
  */
 class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
 {
 
+    /**
+     * @var array<string, mixed>
+     */
     protected $defaults = array();
 
     /**
-     *
      * @var \Ufw\Request|null
      */
     protected $prevRequest = null;
 
     /**
-     *
-     * @var \Laminas\Diactoros\ServerRequest
+     * @var \Ufw\ServerRequest|null
      */
     protected $serverRequest = null;
 
     /** @var \Exception|null */
     protected $runtimeException = null;
 
-    public function __construct($values, $params, $defaults, Request $prevRequest = null, \Laminas\Diactoros\ServerRequest $serverRequest = null)
+    /**
+     * @param array<string, mixed> $values
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $defaults
+     */
+    public function __construct($values, $params, $defaults, Request $prevRequest = null, \Ufw\ServerRequest $serverRequest = null)
     {
         if (!isset($serverRequest)) {
             $serverRequest = ServerRequestFactory::fromGlobals(null, null, null, null, null, null, $values + $params + $defaults);
@@ -38,18 +43,66 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
             ->setServerRequest($serverRequest);
     }
 
+    /**
+     * @return \Ufw\ServerRequest
+     */
+    private function requireServerRequest()
+    {
+        if ($this->serverRequest === null) {
+            throw new \RuntimeException('Server request not initialized.');
+        }
+        return $this->serverRequest;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getModule()
+    {
+        $value = $this->getAttribute('module');
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getController()
+    {
+        $value = $this->getAttribute('controller');
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getAction()
+    {
+        $value = $this->getAttribute('action');
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @param string $name
+     * @return mixed
+     */
     public function __get($name)
     {
         return $this->getAttribute($name);
     }
 
+    /**
+     * @param string $method
+     * @param array<int, mixed> $params
+     * @return mixed
+     */
     public function __call($method, $params)
     {
-        if ($this->getServerRequest() && method_exists($this->getServerRequest(), $method)) {
-            return call_user_func_array([
-                $this->getServerRequest(),
-                $method
-            ], $params);
+        $sr = $this->requireServerRequest();
+        if (method_exists($sr, $method)) {
+            $callable = [$sr, $method];
+            if (is_callable($callable)) {
+                return call_user_func_array($callable, $params);
+            }
         }
 
         if (substr($method, 0, 3) == 'get') {
@@ -65,9 +118,7 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
      */
 
     /**
-     *
-     * @param
-     *            $offset
+     * @param string $offset
      */
     public function offsetExists($offset): bool
     {
@@ -83,162 +134,202 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
     #[\ReturnTypeWillChange]
     public function offsetSet($offset, $value)
     {
-        return $this->withAttribute($offset, $value);
+        $this->withAttribute((string) $offset, $value);
     }
 
     #[\ReturnTypeWillChange]
     public function offsetUnset($offset)
     {
-        return $this->withoutAttribute($offset);
+        $this->withoutAttribute((string) $offset);
     }
 
     /**
      * ** \Psr\Http\Message\ServerRequestInterface proxy implementation ***
      */
+    /**
+     * @return array<string, mixed>
+     */
     public function getAttributes()
     {
-        return $this->getServerRequest()->getAttributes();
+        return $this->requireServerRequest()->getAttributes();
     }
 
+    /**
+     * @param array<string, mixed> $attributes
+     * @return $this
+     */
     public function setAttributes($attributes)
     {
-        $this->getServerRequest()->setAttributes($attributes);
+        $this->requireServerRequest()->setAttributes($attributes);
         return $this;
     }
 
     public function getAttribute($attribute, $default = null)
     {
-        return $this->getServerRequest()->getAttribute($attribute, $default);
+        return $this->requireServerRequest()->getAttribute($attribute, $default);
     }
 
+    /**
+     * @return array<int|string, mixed>
+     */
     public function getCookieParams()
     {
-        return $this->getServerRequest()->getCookieParams();
+        return $this->requireServerRequest()->getCookieParams();
     }
 
     public function getMethod()
     {
-        $headerMethod = @$this->getHeader('X-HTTP-Method-Override')[0];
-        return $headerMethod ? $headerMethod : $this->getServerRequest()->getMethod();
+        $header = $this->getHeader('X-HTTP-Method-Override');
+        $headerMethod = isset($header[0]) ? $header[0] : null;
+
+        return $headerMethod ? $headerMethod : $this->requireServerRequest()->getMethod();
     }
 
+    /**
+     * @return array<int|string, mixed>|object|null
+     */
     public function getParsedBody()
     {
-        return $this->getServerRequest()->getParsedBody();
+        return $this->requireServerRequest()->getParsedBody();
     }
 
+    /**
+     * @return array<int|string, mixed>
+     */
     public function getQueryParams()
     {
-        return $this->getServerRequest()->getQueryParams();
+        return $this->requireServerRequest()->getQueryParams();
     }
 
+    /**
+     * @return array<int|string, mixed>
+     */
     public function getServerParams()
     {
-        return $this->getServerRequest()->getServerParams();
+        return $this->requireServerRequest()->getServerParams();
     }
 
+    /**
+     * @return array<int|string, mixed>
+     */
     public function getUploadedFiles()
     {
-        return $this->getServerRequest()->getUploadedFiles();
+        return $this->requireServerRequest()->getUploadedFiles();
     }
 
     public function getRequestTarget()
     {
-        return $this->getServerRequest()->getRequestTarget();
+        return $this->requireServerRequest()->getRequestTarget();
     }
 
     public function getUri()
     {
-        return $this->getServerRequest()->getUri();
+        return $this->requireServerRequest()->getUri();
     }
 
     public function getBody()
     {
-        return $this->getServerRequest()->getBody();
+        return $this->requireServerRequest()->getBody();
     }
 
     public function getHeader($header)
     {
-        return $this->getServerRequest()->getHeader($header);
+        return $this->requireServerRequest()->getHeader($header);
     }
 
     public function getHeaderLine($name)
     {
-        return $this->getServerRequest()->getHeaderLine($name);
+        return $this->requireServerRequest()->getHeaderLine($name);
     }
 
     public function getHeaders()
     {
-        return $this->getServerRequest()->getHeaders();
+        return $this->requireServerRequest()->getHeaders();
     }
 
     public function getProtocolVersion()
     {
-        return $this->getServerRequest()->getProtocolVersion();
+        return $this->requireServerRequest()->getProtocolVersion();
     }
 
     public function hasHeader($header)
     {
-        return $this->getServerRequest()->hasHeader($header);
+        return $this->requireServerRequest()->hasHeader($header);
     }
 
     public function withAttribute($attribute, $value)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withAttribute($attribute, $value));
     }
 
+    /**
+     * @param array<string, mixed> $cookies
+     * @return static
+     */
     public function withCookieParams(array $cookies)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withCookieParams($cookies));
     }
 
     public function withMethod($method)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withMethod($method));
     }
 
     public function withoutAttribute($attribute)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withoutAttribute($attribute));
     }
 
+    /**
+     * @param array<string, mixed>|object|null $data
+     * @return static
+     */
     public function withParsedBody($data)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withParsedBody($data));
     }
 
+    /**
+     * @param array<string, mixed> $query
+     * @return static
+     */
     public function withQueryParams(array $query)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withQueryParams($query));
     }
 
+    /**
+     * @param array<string, mixed> $uploadedFiles
+     * @return static
+     */
     public function withUploadedFiles(array $uploadedFiles)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withUploadedFiles($uploadedFiles));
     }
 
     public function withRequestTarget($requestTarget)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withRequestTarget($requestTarget));
     }
 
     public function withUri(\Psr\Http\Message\UriInterface $uri, $preserveHost = false)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withUri($uri, $preserveHost));
     }
 
     public function withAddedHeader($header, $value)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withAddedHeader(
                 HttpHeaderSanitizer::sanitizeName($header),
                 HttpHeaderSanitizer::sanitizeValue($value)
@@ -247,13 +338,13 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
 
     public function withBody(\Psr\Http\Message\StreamInterface $body)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withBody($body));
     }
 
     public function withHeader($header, $value)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withHeader(
                 HttpHeaderSanitizer::sanitizeName($header),
                 HttpHeaderSanitizer::sanitizeValue($value)
@@ -262,13 +353,13 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
 
     public function withoutHeader($header)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withoutHeader($header));
     }
 
     public function withProtocolVersion($version)
     {
-        return $this->setServerRequest($this->getServerRequest()
+        return $this->setServerRequest($this->requireServerRequest()
             ->withProtocolVersion($version));
     }
 
@@ -289,6 +380,9 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
             return $this->getParsedBody();
         }
         $post = $this->getParsedBody();
+        if (!is_array($post)) {
+            return $default;
+        }
         return array_key_exists($key, $post) ? $post[$key] : $default;
     }
 
@@ -311,14 +405,21 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
         return (isset($this->getServerParams()[$key])) ? $this->getServerParams()[$key] : $default;
     }
 
+    /**
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
     public function getParam($key, $default = null)
     {
         if ($this->offsetExists($key)) {
             return $this->$key;
         } elseif (isset($this->getQueryParams()[$key])) {
             return $this->getQueryParams()[$key];
-        } elseif (isset($this->getParsedBody()[$key])) {
-            return $this->getParsedBody()[$key];
+        }
+        $body = $this->getParsedBody();
+        if (is_array($body) && array_key_exists($key, $body)) {
+            return $body[$key];
         }
         return $default;
     }
@@ -400,7 +501,10 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
      */
     public function isXmlHttpRequest()
     {
-        return @$this->getHeader('X-Requested-With')[0] == 'XMLHttpRequest';
+        $header = $this->getHeader('X-Requested-With');
+        $value = isset($header[0]) ? $header[0] : null;
+
+        return $value == 'XMLHttpRequest';
     }
 
     /**
@@ -409,8 +513,11 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
     public function prefersApplicationJson(): bool
     {
         $sr = $this->getServerRequest();
+        if ($sr === null) {
+            return false;
+        }
 
-        return $sr ? self::acceptPrefersApplicationJson($sr) : false;
+        return self::acceptPrefersApplicationJson($sr);
     }
 
     /**
@@ -425,20 +532,20 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
             return false;
         }
         $negotiator = new \Negotiation\Negotiator();
-        /**
-         * @var \Negotiation\Accept $mediaType
-         */
         $mediaType = $negotiator->getBest($acceptHeader, [
             'text/html',
             'application/json',
         ]);
 
-        return $mediaType && $mediaType->getValue() === 'application/json';
+        if (!$mediaType instanceof \Negotiation\Accept) {
+            return false;
+        }
+
+        return $mediaType->getType() === 'application/json';
     }
 
     /**
-     *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getDefaults()
     {
@@ -446,8 +553,8 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
     }
 
     /**
-     *
-     * @param array $defaults            
+     * @param array<string, mixed> $defaults
+     * @return $this
      */
     public function setDefaults($defaults)
     {
@@ -456,8 +563,7 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
     }
 
     /**
-     *
-     * @return request
+     * @return \Ufw\Request|null
      */
     public function getPrevRequest()
     {
@@ -465,8 +571,8 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
     }
 
     /**
-     *
-     * @param request $prevRequest            
+     * @param \Ufw\Request|null $prevRequest
+     * @return $this
      */
     public function setPrevRequest(Request $prevRequest = null)
     {
@@ -475,8 +581,7 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
     }
 
     /**
-     *
-     * @return \Ufw\ServerRequest
+     * @return \Ufw\ServerRequest|null
      */
     public function getServerRequest()
     {
@@ -484,18 +589,17 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
     }
 
     /**
-     *
-     * @param \Laminas\Diactoros\ServerRequest $serverRequest            
+     * @param \Ufw\ServerRequest $serverRequest
+     * @return $this
      */
-    public function setServerRequest(\Laminas\Diactoros\ServerRequest $serverRequest = null)
+    public function setServerRequest(\Ufw\ServerRequest $serverRequest)
     {
         $this->serverRequest = $serverRequest;
         return $this;
     }
 
     /**
-     *
-     * @return \Exception
+     * @return \Exception|null
      */
     public function getRuntimeException()
     {
@@ -503,8 +607,8 @@ class Request implements \Psr\Http\Message\ServerRequestInterface, \ArrayAccess
     }
 
     /**
-     *
-     * @param \Exception $runtimeException            
+     * @param \Exception|null $runtimeException
+     * @return $this
      */
     public function setRuntimeException($runtimeException)
     {

@@ -9,6 +9,10 @@ namespace Ufw\Helper;
 class FormErrorsToFlashMessenger extends Base
 {
 
+    /**
+     * @param \Ufw\Form\Base|null $form
+     * @return void
+     */
     public function __invoke(\Ufw\Form\Base $form = null)
     {
         if (!$form || !$form->getErrors()) {
@@ -16,8 +20,18 @@ class FormErrorsToFlashMessenger extends Base
         }
         foreach ($form->getErrors() as $key => $value) {
             $element = $form->getElement($key);
-            $label = $element->getLabel() ? $element->getLabel() : $element->getName();
-            $this->flashMessenger()->addMessage(($label ? $label . ': ' : '') . join('<br>', $value), 'error');
+            if ($element === null) {
+                continue;
+            }
+            $labelOpt = $element->getOption('label');
+            $nameAttrib = $element->getAttrib('name');
+            $label = '';
+            if (is_string($labelOpt) && $labelOpt !== '') {
+                $label = $labelOpt;
+            } elseif (is_string($nameAttrib) && $nameAttrib !== '') {
+                $label = $nameAttrib;
+            }
+            $this->flashMessenger()->addMessage(($label !== '' ? $label . ': ' : '') . join('<br>', $value), 'error');
         }
     }
 }

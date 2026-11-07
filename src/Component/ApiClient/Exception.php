@@ -8,55 +8,75 @@ namespace Ufw\Component\ApiClient;
 class Exception extends \Exception
 {
 
+    /**
+     * @var list<string>|null
+     */
     protected $messages;
 
     /**
-     *
-     * @var \Ufw\Component\ApiClient\Response
+     * @var \Ufw\Component\ApiClient\Response|null
      */
     protected $response;
 
+    /**
+     * @param string|list<string>|null $msg
+     * @param int|null $code
+     * @param \Throwable|null $previous
+     */
     public function __construct($msg, $code = null, $previous = null)
     {
         if (!$msg && $previous) {
             if ($previous instanceof \GuzzleHttp\Exception\ServerException) {
                 $msg = $previous->getResponse()->getReasonPhrase();
+            } elseif ($previous instanceof \GuzzleHttp\Exception\RequestException && $previous->hasResponse()) {
+                $httpResponse = $previous->getResponse();
+                $msg = $httpResponse !== null ? $httpResponse->getReasonPhrase() : $previous->getMessage();
             } else {
                 $msg = $previous->getMessage();
                 if (preg_match('~<[^>]+>~', $msg)) {
                     $msg = strip_tags($msg);
                 }
-                if (strlen($msg) > 2048) {
-                    $msg = $previous->getResponse()->getReasonPhrase();
+                if (strlen($msg) > 2048 && $previous instanceof \GuzzleHttp\Exception\RequestException && $previous->hasResponse()) {
+                    $httpResponse = $previous->getResponse();
+                    if ($httpResponse !== null) {
+                        $msg = $httpResponse->getReasonPhrase();
+                    }
                 }
             }
         }
         if (!$code && $previous) {
             $code = $previous->getCode();
         }
-        if (!is_array($msg))
+        if (!is_array($msg)) {
             $msg = array(
-                $msg
+                (string) $msg
             );
+        }
         $firstMsg = reset($msg);
-        parent::__construct($firstMsg, (int) ($code ?? 0), $previous);
+        parent::__construct((string) $firstMsg, (int) ($code ?? 0), $previous);
         $this->setMessages($msg);
     }
 
+    /**
+     * @return list<string>|null
+     */
     public function getMessages()
     {
         return $this->messages;
     }
 
-    protected function setMessages(array $messages = NULL)
+    /**
+     * @param list<string>|null $messages
+     * @return $this
+     */
+    protected function setMessages(array $messages = null)
     {
         $this->messages = $messages;
         return $this;
     }
 
     /**
-     *
-     * @return \Ufw\Component\ApiClient\Response
+     * @return \Ufw\Component\ApiClient\Response|null
      */
     public function getResponse()
     {
@@ -64,8 +84,8 @@ class Exception extends \Exception
     }
 
     /**
-     *
      * @param \Ufw\Component\ApiClient\Response $response
+     * @return $this
      */
     public function setResponse(\Ufw\Component\ApiClient\Response $response)
     {

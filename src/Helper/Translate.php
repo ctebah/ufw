@@ -10,15 +10,27 @@ namespace Ufw\Helper;
 class Translate extends Base
 {
 
+    /**
+     * @param string $str
+     * @return string
+     */
     public function __invoke($str)
     {
         return $this->translate($str);
     }
 
+    /**
+     * @param string $str
+     * @return string
+     */
     public function translate($str)
     {
-        if ($translator = \Ufw\Registry::getInstance()->get('translator')) {
-            $str = $translator($str);
+        $translator = \Ufw\Registry::getInstance()->get('translator');
+        if (is_callable($translator)) {
+            $translated = $translator($str);
+            if (is_string($translated)) {
+                $str = $translated;
+            }
         }
         return $str;
     }

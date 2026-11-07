@@ -5,5 +5,8 @@ namespace Ufw\Form\Element;
 class Hidden extends Input
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'hidden';
 }

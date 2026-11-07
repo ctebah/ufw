@@ -7,12 +7,24 @@ namespace Ufw\Form\Element;
 class Html extends Base
 {
 
+    /**
+     * @var string|null
+     */
     protected $type = null;
 
+    /**
+     * @var string
+     */
     protected $renderScriptPath = 'form/html.php';
-    
+
+    /**
+     * @var bool
+     */
     protected $ignore = true;
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getDefaultOptions()
     {
         return [

@@ -5,10 +5,19 @@ namespace Ufw\Form\Element;
 class Select extends Multi
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'select';
 
+    /**
+     * @var string
+     */
     protected $renderScriptPath = 'form/multi-select.php';
-    
+
+    /**
+     * @var list<string>
+     */
     protected $defaultOptionsToAttribs = [
         'name',
         'id',
@@ -27,14 +36,17 @@ class Select extends Multi
         'size',
         'multiple'
     ];
-    
-    
+
+
     public function __toString()
     {
-        if ((count($this->multiOptions) == 1) && trim(reset($this->multiOptions))) {
-            $this->addClass('has-content');
+        if ((count($this->multiOptions) == 1)) {
+            $first = reset($this->multiOptions);
+            if (is_string($first) && trim($first) !== '') {
+                $this->addClass('has-content');
+            }
         }
         return parent::__toString();
     }
-    
+
 }

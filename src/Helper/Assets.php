@@ -9,40 +9,59 @@ class Assets extends Base
 {
 
     /**
-     *
-     * @var \Ufw\Container
+     * @var \Ufw\Container<\Ufw\Utils\Asset\Css>|null
      */
-    protected $cssSet;
+    protected $cssSet = null;
     
     /**
-     *
-     * @var \Ufw\Container
+     * @var \Ufw\Container<\Ufw\Utils\Asset\Js>|null
      */
-    protected $jsSet;
+    protected $jsSet = null;
     
-    protected $name;
+    /**
+     * @var string|null
+     */
+    protected $name = null;
     
-    protected $configs = [];
+    /**
+     * @var array<string, array<string, mixed>>
+     */
+    protected $configs = array();
 
+    /**
+     * @param string $name
+     * @return $this
+     */
     public function __invoke($name)
     {
         $this->setName($name);
         return $this;
     }
 
+    /**
+     * @return \Ufw\Utils\Asset\Css
+     */
     public function css()
     {
         $asset = $this->getCssSet()->get($this->getName());
         if (!$asset->isInitialized()) {
-            $asset->init($this->getConfig()['css'])->setApplication($this->getApplication());
+            $config = $this->getConfig();
+            $cssConfig = isset($config['css']) && is_array($config['css']) ? $this->normalizeAssetInitData($config['css']) : array();
+            $asset->init($cssConfig)->setApplication($this->getApplication());
         }
         return $asset;
     }
     
+    /**
+     * @param string $position
+     * @return \Ufw\Utils\Asset\Js
+     */
     public function js($position = \Ufw\Utils\Asset\Js::POS_BODY_BOTTOM) {
         $asset = $this->getJsSet()->get($this->getName() . '-' . $position);
         if (!$asset->isInitialized()) {
-            $asset->init($this->getConfig()['js'])->setPosition($position)->setApplication($this->getApplication());
+            $config = $this->getConfig();
+            $jsConfig = isset($config['js']) && is_array($config['js']) ? $this->normalizeAssetInitData($config['js']) : array();
+            $asset->init($jsConfig)->setPosition($position)->setApplication($this->getApplication());
         }
         return $asset;
     }
@@ -52,11 +71,12 @@ class Assets extends Base
      */
     public function getName()
     {
-        return $this->name;
+        return (string) $this->name;
     }
 
     /**
      * @param string $name
+     * @return $this
      */
     public function setName($name)
     {
@@ -64,35 +84,64 @@ class Assets extends Base
         return $this;
     }
     
+    /**
+     * @return array<string, mixed>
+     */
     protected function getConfig() {
-        if (!isset($this->configs[$this->name])) {
-            $min = $this->getApplication()->getConfig()['assets']['serve-minified'];
-            $this->configs[$this->name] = [];
+        $name = $this->getName();
+        if (!isset($this->configs[$name])) {
+            $appConfig = $this->getApplication()->getConfig();
+            $assetsConfig = is_array($appConfig) && isset($appConfig['assets']) && is_array($appConfig['assets'])
+                ? $appConfig['assets']
+                : array();
+            $min = !empty($assetsConfig['serve-minified']);
+            $this->configs[$name] = array();
             if ($min) {
-                $this->configs[$this->name] = include \Ufw\Paths::application() . '/data/assets/' . $this->getName() . '.php';
+                $loaded = include \Ufw\Paths::application() . '/data/assets/' . $name . '.php';
+                $this->configs[$name] = is_array($loaded) ? $this->normalizeAssetInitData($loaded) : array();
             }
-            if (!$this->configs[$this->name]) {
-                $this->configs[$this->name] = include \Ufw\Paths::application() . '/config/assets/' . $this->getName() . '.php';
+            if (!$this->configs[$name]) {
+                $loaded = include \Ufw\Paths::application() . '/config/assets/' . $name . '.php';
+                $this->configs[$name] = is_array($loaded) ? $this->normalizeAssetInitData($loaded) : array();
             }
         }
-        return $this->configs[$this->name];
+        return $this->configs[$name];
     }
-   
+
     /**
-     * @return \Ufw\Container
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    protected function normalizeAssetInitData($value)
+    {
+        if (!is_array($value)) {
+            return array();
+        }
+        $out = array();
+        foreach ($value as $key => $val) {
+            if (is_string($key)) {
+                $out[$key] = $val;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return \Ufw\Container<\Ufw\Utils\Asset\Css>
      */
     protected function getCssSet() {
-        if (!isset($this->cssSet)) {
+        if ($this->cssSet === null) {
             $this->cssSet = new \Ufw\Container(\Ufw\Utils\Asset\Css::class);
         }
         return $this->cssSet;
     }
     
     /**
-     * @return \Ufw\Container
+     * @return \Ufw\Container<\Ufw\Utils\Asset\Js>
      */
     protected function getJsSet() {
-        if (!isset($this->jsSet)) {
+        if ($this->jsSet === null) {
             $this->jsSet = new \Ufw\Container(\Ufw\Utils\Asset\Js::class);
         }
         return $this->jsSet;

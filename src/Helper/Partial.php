@@ -8,6 +8,11 @@ namespace Ufw\Helper;
 class Partial extends ViewRendererBase
 {
 
+    /**
+     * @param string $script
+     * @param array<string, mixed> $vars
+     * @return string
+     */
     public function __invoke($script, $vars = array())
     {
         return $this->renderHtml($vars, "partials/$script", false);

@@ -7,3 +7,9 @@
 /.vscode
 .idea
 /.cursor
+/coverage/
+/tmp/
+.phpunit.cache/
+.phpunit-*.txt
+/body
+/ok

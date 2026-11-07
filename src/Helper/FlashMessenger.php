@@ -18,10 +18,13 @@ class FlashMessenger extends Base
     /**
      * $_messages - Messages from previous request
      *
-     * @var array
+     * @var array<string, list<string>>
      */
     protected static $_messages = array();
 
+    /**
+     * @var int
+     */
     protected $off = 0;
 
     /**
@@ -32,13 +35,14 @@ class FlashMessenger extends Base
 
     /**
      * $_session - storage object
+     *
+     * @var array<string, list<string>>|null
      */
     protected static $_session = null;
 
     /**
      * __construct() - Instance constructor, needed to get iterators, etc
      *
-     * @param string $namespace            
      * @return void
      */
     public function __construct()
@@ -47,26 +51,59 @@ class FlashMessenger extends Base
             if (session_status() == PHP_SESSION_NONE) {
                 session_start();
             }
-            self::$_session = & $_SESSION['ufw__fM'];
-            if (!isset(self::$_session) || !is_array(self::$_session)) {
-                self::$_session = array();
+            $previous = isset($_SESSION['ufw__fM']) && is_array($_SESSION['ufw__fM']) ? $_SESSION['ufw__fM'] : array();
+            foreach ($previous as $namespace => $messages) {
+                if (!is_string($namespace)) {
+                    continue;
+                }
+                self::$_messages[$namespace] = self::normalizeMessageList($messages);
             }
-            foreach (self::$_session as $namespace => $messages) {
-                self::$_messages[$namespace] = $messages;
-                unset(self::$_session[$namespace]);
-            }
+            self::$_session = array();
+            $_SESSION['ufw__fM'] = &self::$_session;
         }
     }
 
+    /**
+     * @param mixed $messages
+     * @return list<string>
+     */
+    protected static function normalizeMessageList($messages)
+    {
+        if (!is_array($messages)) {
+            return array();
+        }
+        $out = array();
+        foreach ($messages as $msg) {
+            if (is_string($msg)) {
+                $out[] = $msg;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return $this
+     */
     public function __invoke()
     {
         return $this;
     }
 
+    /**
+     * @param string|list<string>|null $message
+     * @param string|null $namespace
+     * @param bool $translatable
+     * @return $this
+     */
     public function addMessage($message, $namespace = null, $translatable = true)
     {
-        if ($this->isOff()) {
+        if ($this->isOff() || $message === null) {
             return $this;
+        }
+
+        if (self::$_session === null) {
+            self::$_session = array();
         }
         
         foreach ((array) $message as $msg) {
@@ -78,13 +115,16 @@ class FlashMessenger extends Base
                     self::$_session[$namespace] = array();
                 }
                 
-                self::$_session[$namespace][] = $translatable ? $this->translate($message) : $message;
+                self::$_session[$namespace][] = $translatable ? $this->translate((string) $msg) : (string) $msg;
             }
         }
         
         return $this;
     }
 
+    /**
+     * @return list<string>
+     */
     public function getErrors()
     {
         $out = array_merge($this->getCurrentMessages(self::NAMESPACE_ERROR), $this->getMessages(self::NAMESPACE_ERROR));
@@ -92,6 +132,9 @@ class FlashMessenger extends Base
         return $out;
     }
 
+    /**
+     * @return list<string>
+     */
     public function getInfos()
     {
         $out = array_merge($this->getCurrentMessages(self::NAMESPACE_INFO), $this->getMessages(self::NAMESPACE_INFO));
@@ -99,6 +142,9 @@ class FlashMessenger extends Base
         return $out;
     }
 
+    /**
+     * @return list<string>
+     */
     public function getWarnings()
     {
         $out = array_merge($this->getCurrentMessages(self::NAMESPACE_WARNING), $this->getMessages(self::NAMESPACE_WARNING));
@@ -106,32 +152,51 @@ class FlashMessenger extends Base
         return $out;
     }
 
+    /**
+     * @return bool
+     */
     public function hasErrors()
     {
         return $this->hasMessages(self::NAMESPACE_ERROR) || $this->hasCurrentMessages(self::NAMESPACE_ERROR);
     }
 
+    /**
+     * @return bool
+     */
     public function hasInfos()
     {
         return $this->hasMessages(self::NAMESPACE_INFO) || $this->hasCurrentMessages(self::NAMESPACE_INFO);
     }
 
+    /**
+     * @return bool
+     */
     public function hasWarnings()
     {
         return $this->hasMessages(self::NAMESPACE_WARNING) || $this->hasCurrentMessages(self::NAMESPACE_WARNING);
     }
 
+    /**
+     * @return bool
+     */
     public function isOff()
     {
         return !!$this->off;
     }
 
+    /**
+     * @return $this
+     */
     public function off()
     {
         $this->off++;
         return $this;
     }
 
+    /**
+     * @param bool $force
+     * @return $this
+     */
     public function on($force = false)
     {
         if ($force)
@@ -146,6 +211,7 @@ class FlashMessenger extends Base
      * per action controller messaging between requests
      *
      * @param string $namespace            
+     * @return $this
      */
     public function setNamespace($namespace = 'info')
     {
@@ -167,7 +233,8 @@ class FlashMessenger extends Base
      * getCurrentMessages() - get messages that have been added to the current
      * namespace within this request
      *
-     * @return array
+     * @param string|null $namespace
+     * @return list<string>
      */
     public function getCurrentMessages($namespace = null)
     {
@@ -175,7 +242,7 @@ class FlashMessenger extends Base
             $namespace = $this->getNamespace();
         }
         
-        if ($this->hasCurrentMessages($namespace)) {
+        if ($this->hasCurrentMessages($namespace) && self::$_session !== null) {
             return self::$_session[$namespace];
         }
         
@@ -185,7 +252,8 @@ class FlashMessenger extends Base
     /**
      * getMessages() - Get messages from a specific namespace
      *
-     * @return array
+     * @param string|null $namespace
+     * @return list<string>
      */
     public function getMessages($namespace = null)
     {
@@ -203,7 +271,8 @@ class FlashMessenger extends Base
     /**
      * clear messages from the current request & current namespace
      *
-     * @return boolean
+     * @param string|null $namespace
+     * @return bool
      */
     public function clearCurrentMessages($namespace = null)
     {
@@ -223,7 +292,8 @@ class FlashMessenger extends Base
      * hasCurrentMessages() - check to see if messages have been added to current
      * namespace within this request
      *
-     * @return boolean
+     * @param string|null $namespace
+     * @return bool
      */
     public function hasCurrentMessages($namespace = null)
     {
@@ -237,7 +307,8 @@ class FlashMessenger extends Base
     /**
      * hasMessages() - Wether a specific namespace has messages
      *
-     * @return boolean
+     * @param string|null $namespace
+     * @return bool
      */
     public function hasMessages($namespace = null)
     {

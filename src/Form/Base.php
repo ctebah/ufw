@@ -12,6 +12,9 @@ abstract class Base
 {
     use \Ufw\Form\Attribs, \Ufw\Form\Options, \Ufw\Form\Elements, \Ufw\Form\Translate;
 
+    /**
+     * @var list<string>
+     */
     protected $defaultOptionsToAttribs = [
         'action',
         'class',
@@ -21,6 +24,9 @@ abstract class Base
         'style'
     ];
 
+    /**
+     * @var string|null
+     */
     protected static $renderHelperName = null;
 
     /**
@@ -32,8 +38,14 @@ abstract class Base
      */
     protected $autoViewScript = false;
 
+    /**
+     * @var bool
+     */
     protected $validated = false;
 
+    /**
+     * @param array<string, mixed>|null $options
+     */
     public function __construct(array $options = null)
     {
         $this->setOptionsToAttribs($this->defaultOptionsToAttribs);
@@ -43,10 +55,13 @@ abstract class Base
         $this->postInit();
     }
 
+    /**
+     * @return $this
+     */
     protected function preInit()
     {
         if (null === $this->getAttrib('id')) {
-            $id = trim(strtolower(preg_replace(array(
+            $id = trim(strtolower((string) preg_replace(array(
                 '~^(Ufw\\\\Form\\\\|Form\\\\)~i',
                 '~([A-Z][^A-Z])~',
                 '~[\\\-_]{1,}~'
@@ -60,11 +75,17 @@ abstract class Base
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     protected function init()
     {
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     protected function postInit()
     {
         if (!$this->getAttrib('method')) {
@@ -73,26 +94,33 @@ abstract class Base
         if (!$this->getAttrib('action')) {
             // Falsy $routeName lets {@see \Ufw\Helper\Url::url()} use {@see \Ufw\Router::getCurrentRoute()}; see there.
             $routeName = $this->getApplication()->getRouter()->getCurrentRouteName() ?: null;
+            $urlHelper = $this->getHelper('url');
+            if ($urlHelper === null) {
+                return $this;
+            }
             if ($this->getMethod() == 'post') {
                 // Same route as current request so module-prefixed paths (e.g. staff) are not built with the default route.
-                $qs = $_SERVER['QUERY_STRING'] ?? '';
-                $this->setAction($this->getHelper('url')
-                    ->url([], false, false, $routeName) . ($qs !== '' ? '?' . $qs : ''));
+                $qs = '';
+                if (isset($_SERVER['QUERY_STRING']) && is_string($_SERVER['QUERY_STRING'])) {
+                    $qs = $_SERVER['QUERY_STRING'];
+                }
+                $this->setAction($urlHelper->url([], false, false, $routeName) . ($qs !== '' ? '?' . $qs : ''));
             } else {
-                $this->setAction($this->getHelper('url')
-                    ->url([], false, false, $routeName));
+                $this->setAction($urlHelper->url([], false, false, $routeName));
             }
         }
         return $this;
     }
 
+    /**
+     * @param string $name
+     * @return mixed
+     */
     public function __get($name)
     {
-        if (method_exists($this, 'get' . ucfirst($name))) {
-            return call_user_func(array(
-                $this,
-                'get' . ucfirst($name)
-            ));
+        $getter = 'get' . ucfirst($name);
+        if (method_exists($this, $getter)) {
+            return $this->$getter();
         }
 
         if ($this->hasOption($name)) {
@@ -107,19 +135,25 @@ abstract class Base
         return null;
     }
 
-    public function __set($name, $value)
+    /**
+     * @param string $name
+     * @param mixed $value
+     */
+    public function __set($name, $value): void
     {
-        if (method_exists($this, 'set' . ucfirst($name))) {
-            return call_user_func(array(
-                $this,
-                'set' . ucfirst($name)
-            ), $value);
+        $setter = 'set' . ucfirst($name);
+        if (method_exists($this, $setter)) {
+            $this->$setter($value);
+            return;
         }
         if ($value instanceof \Ufw\Form\Element\Base) {
-            return $this->setElement($name, $value);
+            $this->setElement($name, $value);
         }
     }
 
+    /**
+     * @param string $name
+     */
     public function __isset($name): bool
     {
         return $this->hasOption($name) || $this->hasElement($name) || $this->hasAttrib($name);
@@ -127,42 +161,76 @@ abstract class Base
 
     public function __toString()
     {
-        return $this->getHelper($this->getRenderHelperName())
-            ->form($this);
+        $helper = $this->resolveFormRenderHelper();
+        return $helper->form($this);
     }
 
+    /**
+     * @return \Ufw\Helper\FormRenderHelperBase
+     */
+    protected function resolveFormRenderHelper()
+    {
+        $helper = $this->getHelper($this->getRenderHelperName());
+        if (!$helper instanceof \Ufw\Helper\FormRenderHelperBase) {
+            throw new \RuntimeException(sprintf(
+                'Form render helper %s is not available.',
+                $this->getRenderHelperName()
+            ));
+        }
+        return $helper;
+    }
+
+    /**
+     * @return $this
+     */
     public function getForm()
     {
         return $this;
     }
 
+    /**
+     * @return mixed
+     */
     public function getId()
     {
         return $this->getAttrib('id');
     }
 
+    /**
+     * @param string $name
+     * @return \Ufw\Helper\Base|null
+     */
     public function getHelper($name)
     {
         return $this->getApplication()->getHelper($name);
     }
 
     /**
-     *
      * @return \Ufw\Application
      */
     public function getApplication()
     {
-        return \Ufw\Registry::getInstance()->get('application');
+        $application = \Ufw\Registry::getInstance()->get('application');
+        if (!$application instanceof \Ufw\Application) {
+            throw new \RuntimeException('Application is not registered.');
+        }
+        return $application;
     }
 
+    /**
+     * @param array<string, mixed> $values
+     * @return $this
+     */
     public function populate($values)
     {
         foreach ($this->getElements() as $element) {
-            if (strpos($element->getName(), '[')) {
+            $elementName = $element->getName();
+            if (strpos($elementName, '[') !== false) {
                 $val = $values;
                 $found = true;
-                foreach (preg_split('~[\[\]]~', $element->getName(), -1, PREG_SPLIT_NO_EMPTY) as $part) {
-                    if (isset($val[$part])) {
+                $parts = $this->splitBracketElementNameParts($elementName);
+                foreach ($parts as $part) {
+                    if (is_array($val) && isset($val[$part])) {
                         $val = $val[$part];
                     } else {
                         $found = false;
@@ -173,14 +241,17 @@ abstract class Base
                     $element->setValue($val, $values);
                 }
             } else {
-                if (isset($values[$element->getName()])) {
-                    $element->setValue($values[$element->getName()], $values);
+                if (isset($values[$elementName])) {
+                    $element->setValue($values[$elementName], $values);
                 }
             }
         }
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getValues()
     {
         $out = [];
@@ -197,6 +268,9 @@ abstract class Base
         return $out;
     }
 
+    /**
+     * @return bool
+     */
     public function isValid()
     {
         $valid = true;
@@ -209,6 +283,9 @@ abstract class Base
         return $valid;
     }
 
+    /**
+     * @return array<string, list<string>>
+     */
     public function getErrors()
     {
         $errors = [];
@@ -222,17 +299,17 @@ abstract class Base
     }
 
     /**
-     *
-     * @return string
+     * @return string|null
      */
     public function getAction()
     {
-        return $this->getAttrib('action');
+        $action = $this->getAttrib('action');
+        return is_string($action) ? $action : null;
     }
 
     /**
-     *
      * @param string $action
+     * @return $this
      */
     public function setAction($action)
     {
@@ -241,17 +318,17 @@ abstract class Base
     }
 
     /**
-     *
-     * @return string
+     * @return string|null
      */
     public function getMethod()
     {
-        return $this->getAttrib('method');
+        $method = $this->getAttrib('method');
+        return is_string($method) ? $method : null;
     }
 
     /**
-     *
      * @param string $method
+     * @return $this
      */
     public function setMethod($method)
     {
@@ -260,8 +337,7 @@ abstract class Base
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function getValidated()
     {
@@ -269,8 +345,8 @@ abstract class Base
     }
 
     /**
-     *
-     * @param boolean $validated
+     * @param bool $validated
+     * @return $this
      */
     public function setValidated($validated)
     {
@@ -296,10 +372,11 @@ abstract class Base
     public function getViewScript()
     {
         if ($this->options()->get('viewScript')) {
-            return $this->getOption('viewScript');
+            $viewScript = $this->getOption('viewScript');
+            return is_string($viewScript) ? $viewScript : null;
         }
         if ($this->getAutoViewScript()) {
-            return strtolower(preg_replace([
+            return strtolower((string) preg_replace([
                 '~(?<=(?:[A-Z]))([A-Z]+)([A-Z][A-z])~',
                 '~(?<=(?:[a-z0-9]))([A-Z])~',
                 '~\\\\~'
@@ -321,6 +398,9 @@ abstract class Base
         return $this->setOption('viewScript', $path);
     }
 
+    /**
+     * @return bool
+     */
     public function getAutoViewScript()
     {
         return $this->autoViewScript;
@@ -345,21 +425,54 @@ abstract class Base
     public function getRenderHelperName()
     {
         if (!static::$renderHelperName) {
-            $helperName = @\Ufw\Registry::getInstance()->get('application')->getConfig()['form']['helper'];
-            if (!$helperName) {
-                $helperName = 'bootstrap3';
+            $helperName = 'bootstrap3';
+            $application = \Ufw\Registry::getInstance()->get('application');
+            if ($application instanceof \Ufw\Application) {
+                $config = $application->getConfig();
+                if (is_array($config) && isset($config['form']) && is_array($config['form'])) {
+                    $formConfig = $config['form'];
+                    if (isset($formConfig['helper'])
+                        && is_string($formConfig['helper'])
+                        && $formConfig['helper'] !== ''
+                    ) {
+                        $helperName = $formConfig['helper'];
+                    }
+                }
             }
             self::setRenderHelperName($helperName);
         }
-        return static::$renderHelperName;
+        return (string) static::$renderHelperName;
     }
 
     /**
-     *
      * @param string $renderHelperName
+     * @return void
      */
     public static function setRenderHelperName($renderHelperName)
     {
         static::$renderHelperName = $renderHelperName;
+    }
+
+    /**
+     * @param string $elementName
+     * @return list<string>
+     */
+    protected function splitBracketElementNameParts($elementName)
+    {
+        $parts = $this->pregSplitBracketElementName($elementName);
+        if ($parts === false) {
+            return array();
+        }
+
+        return $parts;
+    }
+
+    /**
+     * @param string $elementName
+     * @return list<string>|false
+     */
+    protected function pregSplitBracketElementName($elementName)
+    {
+        return preg_split('~[\[\]]~', $elementName, -1, PREG_SPLIT_NO_EMPTY);
     }
 }

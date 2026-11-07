@@ -9,8 +9,14 @@ namespace Ufw\Form\Element;
  */
 class Csrf extends Hidden
 {
+    /**
+     * @var bool
+     */
     protected $ignore = true;
 
+    /**
+     * @var string
+     */
     protected $renderScriptPath = 'form/csrf.php';
 
     /**
@@ -22,7 +28,7 @@ class Csrf extends Hidden
     {
         if ($this->hasOption('csrfComponent')) {
             $c = $this->getOption('csrfComponent');
-            if (is_string($c) && $c !== '') {
+            if (is_string($c) && $c !== '' && class_exists($c)) {
                 return $c;
             }
         }
@@ -30,6 +36,9 @@ class Csrf extends Hidden
         return \Ufw\Component\Csrf::class;
     }
 
+    /**
+     * @return $this
+     */
     public function init()
     {
         $this->setAttrib('class', '');

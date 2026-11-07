@@ -18,14 +18,15 @@ echo $this->partial('ufw-form-check-icon-styles-once.php');
         <div class="form-check ufw-form-check-decorated">
             <?php
             $optAttribs = $element->getAttribs();
-            $oc = trim(($optAttribs['class'] ?? '') . ' form-check-input');
+            $optClassAttrib = $optAttribs['class'] ?? '';
+            $oc = trim((is_string($optClassAttrib) ? $optClassAttrib : '') . ' form-check-input');
             $optAttribs['class'] = $oc;
             ?>
-            <?php echo $this->html5Tag()->void('input', ['value' => $optKey, 'id' => $element->getId() . '-' . $ord, 'checked' => !strcmp($element->getValue(), $optKey)] + $optAttribs); ?>
+            <?php echo $this->html5Tag()->void('input', ['value' => $optKey, 'id' => $element->getId() . '-' . $ord, 'checked' => is_string($elementValue = $element->getValue()) && $elementValue == $optKey] + $optAttribs); ?>
             <label class="form-check-label" for="<?php echo $element->getId() . '-' . $ord++; ?>">
                 <span class="ufw-form-check-on" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg></span>
                 <span class="ufw-form-check-off" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/></svg></span>
-                <?php echo htmlspecialchars($optValue, ENT_QUOTES | ENT_HTML5); ?>
+                <?php echo htmlspecialchars(is_string($optValue) ? $optValue : '', ENT_QUOTES | ENT_HTML5); ?>
             </label>
         </div>
     <?php endforeach; ?>

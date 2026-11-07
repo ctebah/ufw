@@ -7,53 +7,70 @@ namespace Ufw\Form;
 trait Attribs {
 
     /**
-     *
-     * @var \Ufw\Form\Collection
+     * @var \Ufw\Form\Collection|null
      */
     protected $attribs = null;
 
+    /**
+     * @var list<string>
+     */
     protected static $translatableAttribs = [
         'placeholder',
         'title',
     ];
 
     /**
-     *
      * @return \Ufw\Form\Collection
      */
-    protected function Attribs()
+    protected function attribs()
     {
-        if (!isset($this->attribs)) {
+        if ($this->attribs === null) {
             $this->attribs = new Collection();
         }
         return $this->attribs;
     }
 
+    /**
+     * @param string $name
+     * @return mixed
+     */
     public function getAttrib($name)
     {
         $out = $this->attribs()->get($name);
-        return $out && in_array($name, static::$translatableAttribs) ? $this->translate($out) : $out;
+        return $out && in_array($name, static::$translatableAttribs, true) ? $this->translate($out) : $out;
     }
 
+    /**
+     * @param string $name
+     * @param mixed $value
+     * @return $this
+     */
     public function setAttrib($name, $value)
     {
         $this->attribs()->set($name, $value);
         return $this;
     }
 
+    /**
+     * @param string $name
+     * @return bool
+     */
     public function hasAttrib($name)
     {
         return $this->attribs()->has($name);
     }
 
+    /**
+     * @param string $name
+     * @return mixed
+     */
     public function removeAttrib($name)
     {
         return $this->attribs()->remove($name);
     }
 
     /**
-     *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getAttribs()
     {
@@ -65,11 +82,12 @@ trait Attribs {
     }
 
     /**
-     *
-     * @param array $values
+     * @param array<string, mixed> $values
+     * @return $this
      */
-    public function setAttribs($values)
+    public function setAttribs(array $values)
     {
-        return $this->attribs()->setAll($values);
+        $this->attribs()->setAll($values);
+        return $this;
     }
 }

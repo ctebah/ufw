@@ -1,0 +1,10 @@
+# Codecov (free for public repos). CI still enforces ≥98% via bin/coverage-check.php.
+coverage:
+  status:
+    project:
+      default:
+        target: 98%
+        threshold: 0%
+    patch:
+      default:
+        target: auto

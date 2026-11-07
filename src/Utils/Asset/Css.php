@@ -13,13 +13,15 @@ class Css extends Base
      */
     protected function getCompiled()
     {
-        if (!isset($this->compiled)) {
+        if ($this->compiled === null) {
             $buf = [];
             $data = $this->getData();
+            if ($data === null) {
+                return '';
+            }
             if (isset($data['cdn']) && is_array($data['cdn'])) {
                 foreach ($data['cdn'] as $resource) {
-                    $buf[] = $this->getApplication()
-                        ->getHelper('html5Tag')
+                    $buf[] = $this->getHtml5TagHelper()
                         ->void('link', [
                         'href' => $resource,
                         'media' => 'all',
@@ -32,8 +34,7 @@ class Css extends Base
                 foreach ($data['local'] as $resource) {
                     if (is_array($resource)) {
                         foreach ($resource as $resourceSingle) {
-                            $buf[] = $this->getApplication()
-                                ->getHelper('html5Tag')
+                            $buf[] = $this->getHtml5TagHelper()
                                 ->void('link', [
                                 'href' => $resource,
                                 'media' => 'all',
@@ -42,8 +43,7 @@ class Css extends Base
                             ]);
                         }
                     } else {
-                        $buf[] = $this->getApplication()
-                            ->getHelper('html5Tag')
+                        $buf[] = $this->getHtml5TagHelper()
                             ->void('link', [
                             'href' => $resource,
                             'media' => 'all',
@@ -55,6 +55,6 @@ class Css extends Base
             }
             $this->compiled = join('', $buf);
         }
-        return $this->compiled;
+        return $this->compiled ?? '';
     }
 }

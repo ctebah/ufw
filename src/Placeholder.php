@@ -8,21 +8,29 @@ namespace Ufw;
 class Placeholder
 {
 
+    /**
+     * @var list<string>
+     */
     protected $data = [];
 
     /**
-     * glue parts separator
-     *
      * @var string
      */
     protected $glue = '';
 
+    /**
+     * @param string $value
+     * @return $this
+     */
     public function append($value)
     {
         $this->data[] = $value;
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     public function captureEnd()
     {
         ob_end_clean();
@@ -30,9 +38,8 @@ class Placeholder
     }
 
     /**
-     *
-     * @param string $mode
-     *            set|append|prepend
+     * @param string $mode set|append|prepend
+     * @return void
      */
     public function captureStart($mode = 'append')
     {
@@ -42,17 +49,28 @@ class Placeholder
         ));
     }
 
+    /**
+     * @return list<string>
+     */
     public function get()
     {
         return $this->data;
     }
 
+    /**
+     * @param string $value
+     * @return $this
+     */
     public function prepend($value)
     {
         array_unshift($this->data, $value);
         return $this;
     }
 
+    /**
+     * @param string $value
+     * @return $this
+     */
     public function set($value)
     {
         $this->data = [$value];
@@ -65,7 +83,6 @@ class Placeholder
     }
 
     /**
-     *
      * @return string
      */
     public function getGlue()
@@ -74,8 +91,8 @@ class Placeholder
     }
 
     /**
-     *
      * @param string $glue
+     * @return $this
      */
     public function setGlue($glue)
     {

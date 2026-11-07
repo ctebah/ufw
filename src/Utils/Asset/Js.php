@@ -15,6 +15,9 @@ class Js extends Base
 
     const POS_BODY_END = 'body-end';
 
+    /**
+     * @var self::POS_*|string
+     */
     protected $position = self::POS_BODY_BOTTOM;
 
     /**
@@ -23,45 +26,58 @@ class Js extends Base
      */
     protected function getCompiled()
     {
-        if (!isset($this->compiled)) {
+        if ($this->compiled === null) {
             $buf = [];
             $last = [];
             $data = $this->getData();
+            if ($data === null) {
+                return '';
+            }
             if (isset($data['cdn']) && is_array($data['cdn'])) {
                 foreach ($data['cdn'] as $resource) {
+                    if (!is_string($resource) && !is_array($resource)) {
+                        continue;
+                    }
                     $resource = $this->getResourceStruct($resource);
                     if (strcmp($resource['position'], $this->getPosition())) {
                         continue;
                     }
-                    $buf[] = $this->getApplication()
-                        ->getHelper('html5Tag')
+                    $buf[] = $this->getHtml5TagHelper()
                         ->full('script', $this->getTagAttribs($resource), '');
                 }
             }
             if (isset($data['local']) && is_array($data['local'])) {
                 if (!strcmp(self::POS_BODY_BOTTOM, $this->getPosition())) {
                     foreach ($data['local'] as $resource) {
+                        if (!is_string($resource) && !is_array($resource)) {
+                            continue;
+                        }
                         if (is_array($resource) && !isset($resource['src'])) {
                             foreach ($resource as $resourceSingle) {
+                                if (!is_string($resourceSingle) && !is_array($resourceSingle)) {
+                                    continue;
+                                }
                                 $resourceSingle = $this->getResourceStruct($resourceSingle);
-                                $buf[] = $this->getApplication()
-                                    ->getHelper('html5Tag')
+                                $buf[] = $this->getHtml5TagHelper()
                                     ->full('script', $this->getTagAttribs($resourceSingle), '');
                             }
-                        } else {
-                            $resource = $this->getResourceStruct($resource);
-                            $buf[] = $this->getApplication()
-                                ->getHelper('html5Tag')
-                                ->full('script', $this->getTagAttribs($resource), '');
+                            continue;
                         }
+                        $resource = $this->getResourceStruct($resource);
+                        $buf[] = $this->getHtml5TagHelper()
+                            ->full('script', $this->getTagAttribs($resource), '');
                     }
                 }
             }
             $this->compiled = join('', array_merge($buf, $last));
         }
-        return $this->compiled;
+        return $this->compiled ?? '';
     }
 
+    /**
+     * @param string|array<int|string, mixed> $resource
+     * @return array{src: string, position: string, attribs: array<string, mixed>}
+     */
     protected function getResourceStruct($resource)
     {
         if (is_string($resource)) {
@@ -73,9 +89,21 @@ class Js extends Base
             'position' => self::POS_BODY_BOTTOM,
             'attribs' => []
         ];
-        return $resource;
+        $src = isset($resource['src']) && (is_string($resource['src']) || is_int($resource['src'])) ? (string) $resource['src'] : '';
+        $position = isset($resource['position']) && (is_string($resource['position']) || is_int($resource['position']))
+            ? (string) $resource['position']
+            : self::POS_BODY_BOTTOM;
+        return [
+            'src' => $src,
+            'position' => $position,
+            'attribs' => is_array($resource['attribs']) ? \Ufw\filter_string_keyed_array($resource['attribs']) : [],
+        ];
     }
 
+    /**
+     * @param array{src: string, position: string, attribs: array<string, mixed>} $resource
+     * @return array<string, mixed>
+     */
     protected function getTagAttribs($resource)
     {
         return array_merge($resource['attribs'], [
@@ -93,8 +121,8 @@ class Js extends Base
     }
 
     /**
-     *
-     * @param string $position
+     * @param self::POS_*|string $position
+     * @return $this
      */
     public function setPosition($position)
     {

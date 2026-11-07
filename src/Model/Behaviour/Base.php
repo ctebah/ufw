@@ -8,20 +8,23 @@ namespace Ufw\Model\Behaviour;
  * Concrete behaviours implement only the hooks they need (registration uses {@see $behaviourMethods} ∩ class methods).
  * Optional hook shapes (match how {@see \Ufw\Model\Record\Base} invokes them):
  *
- * @method array  beforeDataSet(array $data, array $opts = [])
- * @method void   afterDataSet(array $opts = [])
- * @method mixed  beforeDelete(array $opts = [])
- * @method void   afterDelete(mixed $success, array $opts = [])
- * @method mixed  beforeInsert(array $opts = [])
- * @method void   afterInsert(mixed $success, array $opts = [])
- * @method mixed  beforeUpdate(array $opts = [])
- * @method void   afterUpdate(mixed $success, array $opts = [])
- * @method mixed  beforeSave(array $opts = [])
- * @method void   afterSave(mixed $success, array $opts = [])
+ * @method array<string, mixed> beforeDataSet(array<string, mixed> $data, array<string, mixed> $opts = [])
+ * @method void   afterDataSet(array<string, mixed> $opts = [])
+ * @method mixed  beforeDelete(array<string, mixed> $opts = [])
+ * @method void   afterDelete(mixed $success, array<string, mixed> $opts = [])
+ * @method mixed  beforeInsert(array<string, mixed> $opts = [])
+ * @method void   afterInsert(mixed $success, array<string, mixed> $opts = [])
+ * @method mixed  beforeUpdate(array<string, mixed> &$opts = [])
+ * @method void   afterUpdate(mixed $success, array<string, mixed> $opts = [])
+ * @method mixed  beforeSave(array<string, mixed> $opts = [])
+ * @method void   afterSave(mixed $success, array<string, mixed> $opts = [])
  */
 abstract class Base
 {
 
+    /**
+     * @var array<int, string>
+     */
     public static $behaviourMethods = [
         'beforeDataSet',
         'afterDataSet',
@@ -34,6 +37,14 @@ abstract class Base
         'beforeSave',
         'afterSave'
     ];
+
+    /**
+     * Lower runs first on every hook. Record config key <code>order</code> overrides this.
+     * Behaviours that do not set one land at 500, after the bundled 100–150 block.
+     *
+     * @var int
+     */
+    public $order = 500;
 
     /**
      *
@@ -58,17 +69,25 @@ abstract class Base
     /**
      *
      * @param \Ufw\Model\Record\Base $owner
+     * @return $this
      */
     public function setOwner($owner)
     {
         $this->owner = $owner;
         return $this;
     }
-    
+
+    /**
+     * @return \Ufw\Application
+     */
     public function getApplication() {
-        return \Ufw\Registry::getInstance()->get('application');
+        return \Ufw\Registry::getInstance()->getApplication();
     }
-    
+
+    /**
+     * @param string $name
+     * @return \Ufw\Helper\Base|null
+     */
     public function getHelper($name) {
         return $this->getApplication()->getHelper($name);
     }

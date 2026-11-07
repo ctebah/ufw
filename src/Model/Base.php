@@ -20,20 +20,25 @@ abstract class Base
     public function __construct()
     {}
 
+    /**
+     * @param string $name
+     * @return mixed
+     */
     public function __get($name)
     {
-        if (method_exists($this, 'get' . ucfirst($name))) {
-            return call_user_func(array(
-                $this,
-                'get' . ucfirst($name)
-            ));
+        $method = 'get' . ucfirst($name);
+        if (method_exists($this, $method)) {
+            return $this->$method();
         }
         return null;
     }
 
+    /**
+     * @return \Ufw\Db\Db
+     */
     public function getDb()
     {
-        return \Ufw\Db\Db::instance();
+        return \Ufw\Db\Db::forApp();
     }
     
     /**
@@ -51,11 +56,18 @@ abstract class Base
      */
     public function getApplication()
     {
-        return \Ufw\Registry::getInstance()->get('application');
+        return \Ufw\Registry::getInstance()->getApplication();
     }
 
+    /**
+     * @return mixed
+     */
     public function getUser()
     {
-        return $this->getApplication()->getHelper('user')();
+        $helper = $this->getApplication()->getHelper('user');
+        if (is_callable($helper)) {
+            return $helper();
+        }
+        return $helper;
     }
 }

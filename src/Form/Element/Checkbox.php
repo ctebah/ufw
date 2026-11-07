@@ -7,16 +7,34 @@ namespace Ufw\Form\Element;
 class Checkbox extends Base
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'checkbox';
 
+    /**
+     * @var string
+     */
     protected $checkedValue = '1';
 
+    /**
+     * @var string
+     */
     protected $uncheckedValue = '0';
 
+    /**
+     * @var bool
+     */
     protected $checked = false;
 
+    /**
+     * @var string
+     */
     protected $renderScriptPath = 'form/checkbox.php';
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getDefaultOptions()
     {
         return [
@@ -28,7 +46,6 @@ class Checkbox extends Base
     }
 
     /**
-     *
      * @return string
      */
     public function getCheckedValue()
@@ -37,8 +54,8 @@ class Checkbox extends Base
     }
 
     /**
-     *
      * @param string $checkedValue
+     * @return $this
      */
     public function setCheckedValue($checkedValue)
     {
@@ -47,7 +64,6 @@ class Checkbox extends Base
     }
 
     /**
-     *
      * @return string
      */
     public function getUncheckedValue()
@@ -56,8 +72,8 @@ class Checkbox extends Base
     }
 
     /**
-     *
      * @param string $uncheckedValue
+     * @return $this
      */
     public function setUncheckedValue($uncheckedValue)
     {
@@ -65,6 +81,11 @@ class Checkbox extends Base
         return $this;
     }
 
+    /**
+     * @param mixed $value
+     * @param array<string, mixed>|null $context
+     * @return $this
+     */
     public function setValue($value, $context = null)
     {
         if ($value == $this->getCheckedValue()) {
@@ -78,8 +99,7 @@ class Checkbox extends Base
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function getChecked()
     {
@@ -87,8 +107,8 @@ class Checkbox extends Base
     }
 
     /**
-     *
-     * @param boolean $checked
+     * @param bool $checked
+     * @return $this
      */
     public function setChecked($checked)
     {

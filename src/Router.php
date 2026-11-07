@@ -16,13 +16,13 @@ class Router
 
     /**
      *
-     * @var \Ufw\Route\Base
+     * @var \Ufw\Route\Base|null
      */
     protected $currentRoute = null;
 
     /**
      *
-     * @var string
+     * @var string|null
      */
     protected $currentRouteName = null;
 
@@ -32,8 +32,14 @@ class Router
      */
     protected $request = null;
 
+    /**
+     * @var array<string, array<string, mixed>>|null
+     */
     protected $routes = null;
 
+    /**
+     * @param array<string, array<string, mixed>> $routeDefinitions
+     */
     public function __construct(\Ufw\Application $application, \Ufw\Request $request, array $routeDefinitions)
     {
         $this->setApplication($application)
@@ -41,14 +47,22 @@ class Router
             ->setRoutes($routeDefinitions);
     }
 
+    /**
+     * @return \Ufw\Route\Base|null
+     */
     public function match()
     {
         $rawUri = $this->getRequest()->getServer('REQUEST_URI');
-        if ($rawUri === null || $rawUri === '') {
+        if (!is_string($rawUri) || $rawUri === '') {
             $rawUri = '/';
         }
-        $path = preg_replace('~\?.*$~', '', (string) $rawUri);
-        foreach ($this->getRoutes() as $routeName => $routeDef) {
+        $stripped = preg_replace('~\?.*$~', '', $rawUri);
+        $path = is_string($stripped) ? $stripped : $rawUri;
+        $routes = $this->getRoutes();
+        if (!is_array($routes)) {
+            return null;
+        }
+        foreach ($routes as $routeName => $routeDef) {
             $route = $this->getRoute($routeName);
             $match = $route->matchRequestPath($path);
             if ($match === false) {
@@ -94,16 +108,30 @@ class Router
      */
     public function getRoute($routeName)
     {
-        if (!isset($this->getRoutes()[$routeName]['route'])) {
-            $class = $this->routes[$routeName]['type'];
-            $this->routes[$routeName]['route'] = new $class($this, $this->getRoutes()[$routeName]);
+        $routes = $this->routes;
+        if (!is_array($routes) || !isset($routes[$routeName])) {
+            throw new \LogicException('Unknown route');
         }
-        return $this->getRoutes()[$routeName]['route'];
+        if (!isset($routes[$routeName]['route'])) {
+            $type = $routes[$routeName]['type'] ?? null;
+            if (!is_string($type) || !is_a($type, \Ufw\Route\Base::class, true)) {
+                throw new \LogicException('Invalid route type');
+            }
+            /** @var class-string<\Ufw\Route\Base> $type */
+            $routes[$routeName]['route'] = new $type($this, $routes[$routeName]);
+            $this->routes = $routes;
+        }
+        $route = $routes[$routeName]['route'];
+        if (!$route instanceof \Ufw\Route\Base) {
+            throw new \LogicException('Invalid route instance');
+        }
+
+        return $route;
     }
 
     /**
      *
-     * @return array
+     * @return array<string, array<string, mixed>>|null
      */
     public function getRoutes()
     {
@@ -112,7 +140,8 @@ class Router
 
     /**
      *
-     * @param array $routes
+     * @param array<string, array<string, mixed>> $routes
+     * @return $this
      */
     public function setRoutes($routes)
     {
@@ -132,6 +161,7 @@ class Router
     /**
      *
      * @param \Ufw\Application $application
+     * @return $this
      */
     public function setApplication($application)
     {
@@ -151,6 +181,7 @@ class Router
     /**
      *
      * @param \Ufw\Request $request
+     * @return $this
      */
     public function setRequest($request)
     {
@@ -160,7 +191,7 @@ class Router
 
     /**
      *
-     * @return \Ufw\Route\Base $currentRoute
+     * @return \Ufw\Route\Base|null
      */
     public function getCurrentRoute()
     {
@@ -169,7 +200,8 @@ class Router
 
     /**
      *
-     * @param \Ufw\Route\Base $currentRoute
+     * @param \Ufw\Route\Base|null $currentRoute
+     * @return $this
      */
     public function setCurrentRoute($currentRoute)
     {
@@ -179,7 +211,7 @@ class Router
 
     /**
      *
-     * @return string
+     * @return string|null
      */
     public function getCurrentRouteName()
     {
@@ -188,7 +220,8 @@ class Router
 
     /**
      *
-     * @param string $currentRouteName
+     * @param string|null $currentRouteName
+     * @return $this
      */
     public function setCurrentRouteName($currentRouteName)
     {

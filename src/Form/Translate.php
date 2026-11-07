@@ -7,43 +7,61 @@ namespace Ufw\Form;
 trait Translate {
 
     /**
-     *
-     * @var boolean
+     * @var bool
      */
     protected $disableTranslator = false;
 
+    /**
+     * @var callable|null
+     */
     protected $translator = null;
 
+    /**
+     * @param mixed $str
+     * @return mixed
+     */
     public function translate($str)
     {
         if (!$str || !$this->hasTranslator()) {
             return $str;
         }
         $translator = $this->getTranslator();
+        if (!is_callable($translator)) {
+            return $str;
+        }
         if (is_array($str)) {
             $out = [];
             foreach ($str as $key => $value) {
                 $out[$key] = $translator($value);
             }
             return $out;
-        } else {
-            return $translator($str);
         }
+
+        return $translator($str);
     }
 
+    /**
+     * @return bool
+     */
     public function hasTranslator()
     {
         return !$this->disableTranslator && $this->getTranslator();
     }
 
+    /**
+     * @return callable|null
+     */
     public function getTranslator()
     {
-        return $this->translator ? $this->translator : \Ufw\Registry::getInstance()->get('translator');
+        if ($this->translator !== null) {
+            return $this->translator;
+        }
+        $fromRegistry = \Ufw\Registry::getInstance()->get('translator');
+        return is_callable($fromRegistry) ? $fromRegistry : null;
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function getDisableTranslator()
     {
@@ -51,8 +69,8 @@ trait Translate {
     }
 
     /**
-     *
-     * @param boolean $disableTranslator
+     * @param bool $disableTranslator
+     * @return $this
      */
     public function setDisableTranslator($disableTranslator)
     {

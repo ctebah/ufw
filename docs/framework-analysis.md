@@ -25,13 +25,13 @@ UFW sits between a bare PSR stack and a full "kitchen sink" framework. It wires 
 - Zero `final class` declarations in `src/`. Every base class - `Application`, `Controller\Base`, `Form\Base`, `Record\Base`, `Helper\Base`, `Route\Base`, `Db`, `Component\Csrf`, `Component\ApiClient\Base`, even `Singleton` - is open for subclassing. Apps that need different behaviour subclass and replace; they do not patch `vendor/`.
 - Helper resolution checks `\Helper\{Name}` (app) before `\Ufw\Helper\{Name}` (framework), so a project-side helper transparently shadows the shipped one without configuration. Same for form partials when you swap the helper class.
 - Pluggable seams across the stack:
-    - `Response::registerFormat($name, $handler)` - add `csv`, custom JSON envelopes, anything callable.
-    - `Route\Base` - write a custom route type alongside `Route\RegEx` and `Route\Literal`.
-    - `Form\Element\*`, `Form\Validator\*`, `Form\Filter\*` - new field types and rules.
-    - `csrfComponent` Form option - swap the CSRF component (e.g. encrypted-cookie variant) without touching `Form\Base`.
-    - `dispatch.controller_aliases` and `dispatch.module.{name}.controller_aliases` - re-point any controller name to a different class.
-    - `Db` and `Record\Base` `$dbconnIdent` - multi-connection routing without forking either class.
-- `Application` itself can be subclassed. The `Singleton` trait caches one instance per concrete class, so an `App\Application extends Ufw\Application` becomes its own canonical singleton in `Registry`. The same applies to `Db`, `JsOut`, `Registry`, and any other singleton-based component.
+  - `Response::registerFormat($name, $handler)` - add `csv`, custom JSON envelopes, anything callable.
+  - `Route\Base` - write a custom route type alongside `Route\RegEx` and `Route\Literal`.
+  - `Form\Element\*`, `Form\Validator\*`, `Form\Filter\*` - new field types and rules.
+  - `csrfComponent` Form option - swap the CSRF component (e.g. encrypted-cookie variant) without touching `Form\Base`.
+  - `dispatch.controller_aliases` and `dispatch.module.{name}.controller_aliases` - re-point any controller name to a different class.
+  - `Db` and `Record\Base` `$dbconnIdent` - multi-connection routing without forking either class.
+- `Application` itself can be subclassed. The `Singleton` trait caches one instance per concrete class, so an `App\Application extends Ufw\Application` becomes its own canonical singleton in `Registry`. The same applies to `JsOut`, `Registry`, and any other component that uses the trait. `Db` does not use it; apps point `getDb()` at a subclass with the `db.class` config key.
 - This is the recurring theme of the [documentation index](README.md): defaults, not contracts. Adopt the base, wrap it, or replace it.
 
 ### Standards and interoperability
@@ -68,8 +68,9 @@ UFW sits between a bare PSR stack and a full "kitchen sink" framework. It wires 
 
 ### Database layer
 
-- `Db` centralizes connections (host / port / socket / collation / time zone), logging hooks (`DBLOG_ENV`), and CRUD-style helpers (`insert`, `update`, `delete`, `simple_select_query`) with caller file/line captured for debugging. Practical for small and mid-sized codebases.
-- `simple_select_query` accepts a `Record` class name, returning hydrated instances rather than raw arrays - small but ergonomic.
+- `Db` centralizes connections (host / port / socket / collation / time zone), logging hooks (`DBLOG_ENV`), and CRUD-style helpers (`simple_insert`, `simple_update`, `simple_delete`, `simple_select_query`) with caller file/line captured for debugging. Practical for small and mid-sized codebases.
+- `simple_select` and `fetch_all` accept a `Record` class name, returning hydrated instances rather than raw arrays - small but ergonomic.
+- Failed queries are logged and return `false` by default; `___opts` in `dbconns.php` can opt into throwing `QueryException`, a different log file, or a log without `$_POST`. Record behaviours run in a declared `order`, and the bundled `ChangedOnly` (140) and `OptimisticLock` (150) apply only to record classes that list them in `behaviours()`.
 
 ### API client
 
@@ -97,7 +98,7 @@ UFW sits between a bare PSR stack and a full "kitchen sink" framework. It wires 
 
 Non-obvious wins that pay off in day-to-day work:
 
-- **Form metadata exposed to JavaScript.** Bootstrap 3/4/5 form partials render a `_metadata.php` snippet that binds each form element to a client-side `WeakMap` (`window.__ufwElementMeta`). The app can attach per-element data (parent-child dropdown dependencies, conditional visibility rules, computed field relationships) without inventing `data-*` conventions, duplicating JSON blobs in the DOM, or querying back to the server. The `ufwMeta` helper wires this up; form JS then reads metadata straight from the element reference.
+- **Form metadata exposed to JavaScript.** Bootstrap 3/4/5 form partials render a `_metadata.php` snippet that binds each form element to a client-side `WeakMap` (`window.__ufwElementMeta`). The app can attach per-element data (parent-child dropdown dependencies, conditional visibility rules, computed field relationships) without inventing `data-*` conventions, duplicating JSON blobs in the DOM, or querying back to the server. The form render helpers write the metadata; form JS reads it straight from the element reference, directly or through the optional `ufwMeta()` function in `resources/js/ufwmeta.js`.
 - **Per-form view script.** `Form\Base` exposes a `viewScript` option (`setViewScript($path)`): when set, the entire form layout is rendered from that PHP template instead of the default helper loop. You keep the form object as the single source of truth for fields, filters, validators, and element metadata; you still get custom layout (multi-column, tabs, accordion sections, mixed HTML) without subclassing the render helper. Practical split - in the form you think about fields and rules, in the view script you think about layout.
 - **`InfoHash` as a DB result shaper.** Classic ORMs push heavy joins and then normalize the wide row back into objects, spending memory on duplicated columns and CPU on post-join mapping. `InfoHash` inverts that: `set_data($query, RecordClass::class)` hydrates the page rows id-keyed in `$info` (with a secondary index in `$hash`), `aggregate_data($query2, 'id')` merges extra columns from a second narrow query, and `add_array_data($query3, 'id', 'tags')` pushes related rows under a property on each parent. `getTotalCount()` even peels `LIMIT`/`ORDER BY` off the recorded query for paginated views. Memory per row stays tight, SQL stays grep-able, and you avoid Cartesian explosion. See the worked example in [InfoHash](info-hash.md).
 
@@ -111,7 +112,7 @@ Non-obvious wins that pay off in day-to-day work:
 
 ### Global state and coupling
 
-- `Registry`, `Application` singleton, `Db::getInstance()`, `Response::getRequest()` reaching back through `Registry`, and the `APPLICATION_PATH` constant all increase hidden coupling and complicate unit testing and parallel-request scenarios (long-running workers, Swoole-style runtimes).
+- `Registry`, `Application` singleton, `Db::instance()`, `Response::getRequest()` reaching back through `Registry`, and the `APPLICATION_PATH` constant all increase hidden coupling and complicate unit testing and parallel-request scenarios (long-running workers, Swoole-style runtimes).
 - `Ufw\Container` exists but is a typed lazy factory (one `dataType` per container, reflection `newInstance` per key) - not a generic DI container. Framework resolution still goes through `Registry` and singletons.
 
 ### Exception handling and logging
@@ -135,7 +136,7 @@ Non-obvious wins that pay off in day-to-day work:
 
 ### Testing and quality gates
 
-- No `tests/` directory and no `phpstan.*` / `psalm.*` / `phpcs.*` config in the repository. Regressions in dispatch, `Response`, or `Request` are easy to introduce.
+- PHPUnit 11 on PHP 8.2: **unit** suite (`tests/Unit`, domain subfolders) and **component** suite (`tests/Component`, MySQL). PCOV measures all of **`src/`** including bundled view partials; **`composer coverage-check`** enforces a **98%** floor (see [testing.md](testing.md)). PHPStan 2 **level 10** on all of `src/` (`phpstan.neon.dist`, no baseline). No Psalm or PHPCS config in this repo.
 
 ### PHP version
 
@@ -204,7 +205,7 @@ Non-obvious wins that pay off in day-to-day work:
 | Middleware | Stratigility pipe; `DummyFinal` closes the pipeline; auth implemented in app middleware. |
 | Controller base | Layout, render, middleware hooks (`middlewaresPre` / `middlewaresPost`); productive defaults. |
 | Forms | Server-rendered focus; elements + validators + filters; partials for Bootstrap 3 / 4 / 5 plus plain BS3/4 (no Material icons); BS5 uses inline SVG affordance for checkbox/radio. CSRF via `Form\Element\Csrf` + `Form\Validator\Csrf` + `Ufw\Component\Csrf`. |
-| Db | MySQLi-centric convenience (host / port / socket / collation); `simple_select_query` accepts a `Record` class for hydration. Prefer prepared statements in new code. |
+| Db | MySQLi-centric convenience (host / port / socket / collation); `simple_select` and `fetch_all` accept a `Record` class for hydration. Prefer prepared statements in new code. |
 | ApiClient | `Ufw\Component\ApiClient` over Guzzle - magic verbs, optional `Form\Base` integration for 422-style error mapping. |
 | JsOut / assets | Concatenates `js*` placeholders, sanitizes embedded `<script>`, minifies via JShrink, writes `.js`/`.min.js`/`.min.js.gz`. `readyWrapper` modes: `module` (default), `classic`, `jquery`, `none`. Falls back to plain `<script>` tags when `jsOutStorage` is unset. |
 | Views | Partial/layout conventions; framework partials under `Ufw/src/views/` as fallback after app `views/`. Bootstrap 3, 4, 5 form partials maintained in parallel - keep only what you ship. |
@@ -215,8 +216,8 @@ Non-obvious wins that pay off in day-to-day work:
 
 ## Recommendations (prioritized)
 
-1. Add a minimal PHPUnit suite: router match, dispatch to a dummy controller, JSON middleware, one `Response::emit` path, and one `BreakExecution` → `dispatchError` round-trip.
-2. Introduce PHPStan (level 5–8) or Psalm to catch interface mismatches early - especially `Request` / `Response` vs PSR-7 strict consumers.
+1. Keep extending PHPUnit where apps still feel risk: full-stack browser tests and deployment-specific config remain the application's responsibility. Core already exercises dispatch helpers, forms, partials, ApiClient, and record behaviours in unit/component suites.
+2. PHPStan level 10 now covers all of `src/` (including HTTP, forms, views, and helpers). Further tightening is mostly app-specific `@property` on concrete record classes and optional stricter typing at API boundaries.
 3. Extend the deployment checklist already in [security.md](security.md) with concrete examples (PHP-FPM `expose_php`, `display_errors`, session cookie flags, trusted proxy lists per CDN). The base policy is documented; the worked examples are not.
 4. Replace mutable `with*` on `Request` and `Response` with true immutability, or relabel both as "mutable façade" in the type system (e.g. drop `implements ResponseInterface` claims and expose a separate PSR-7 view) so downstream PSR-7 consumers do not get fooled.
 5. Prefer prepared statements in new DB access code; optionally wrap `mysqli` / `PDO` with a thin repository layer. Keep the existing escape-based helpers for legacy paths only.
@@ -235,13 +236,13 @@ UFW is a single vertical slice of a PHP web stack - HTTP plumbing, dispatch, vie
 Honest tradeoffs:
 
 - Older patterns (Registry singleton, `APPLICATION_PATH` constant, mutable `with*` on `Request` / `Response`) coexist with newer ones (layered `Paths` / `Envs`, `Component\Csrf`, pluggable `Response::registerFormat()`). Modernization is incremental, not a clean break.
-- Quality gates (tests, static analysis) are absent from the repo. The code reads carefully but a regression in `Application::run`, `Router::match`, or `Response::buildInnerResponseObject` would not be caught automatically.
+- Quality gates: PHPUnit (unit + MySQL component), PCOV on `src/` with a documented 98% release floor, and PHPStan level 10 on `src/`. Remaining Clover gaps are mostly intentional (`die()` without suppress constants). Browser-level E2E is still an app concern.
 - Scope is owned (classic vs method-as-class controllers, regex + literal routes, server-rendered forms, `Db` escape helpers) rather than absorbed from every other stack. That focus is what keeps the codebase navigable; it is also why apps with very different needs (heavy ORM, GraphQL, fully reactive front-end) will outgrow it.
 
 ---
 
 ## Closing
 
-UFW is a coherent, pragmatic framework for PHP applications that want routing, controllers, middleware, forms, and MySQL helpers without adopting Symfony/Laravel wholesale. Main gaps: automated tests, static analysis, prepared statements in `Db`, and an authentication opinion (the framework deliberately leaves identity to the app). Policy surfaces the app must own are documented in [security.md](security.md), [error-handling.md](error-handling.md), and [csrf.md](csrf.md). Adding quality gates would meaningfully improve long-term maintainability.
+UFW is a coherent, pragmatic framework for PHP applications that want routing, controllers, middleware, forms, and MySQL helpers without adopting Symfony/Laravel wholesale. Main gaps: tests and static analysis for the HTTP stack (dispatch, `Request` / `Response`, forms), prepared statements in `Db`, and an authentication opinion (the framework deliberately leaves identity to the app). Policy surfaces the app must own are documented in [security.md](security.md), [error-handling.md](error-handling.md), and [csrf.md](csrf.md). Extending the existing quality gates to the HTTP stack would meaningfully improve long-term maintainability.
 
 ← [Documentation index](README.md) · [Linear guides (Parts A–D)](README.md#full-detail-all-guides)

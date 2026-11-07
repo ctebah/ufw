@@ -7,19 +7,25 @@ namespace Ufw\Component\ApiClient\Base;
 abstract class Execute extends \Ufw\Component\ApiClient\Base
 {
 
+    /**
+     * @return \Ufw\Component\ApiClient\Response|null
+     */
     abstract protected function _do();
 
     /**
-     *
-     * @return \Ufw\Component\ApiClient\Base\Execute
+     * @return $this
      */
     public function run()
     {
         return $this->_run(function () {
             $this->_do();
+            return $this->getResponse();
         });
     }
 
+    /**
+     * @return $this
+     */
     public function __invoke()
     {
         return $this->run();

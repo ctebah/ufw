@@ -5,5 +5,8 @@ namespace Ufw\Form\Element;
 class Text extends Input
 {
 
+    /**
+     * @var string
+     */
     protected $type = 'text';
 }

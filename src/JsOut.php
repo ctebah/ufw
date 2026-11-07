@@ -19,38 +19,64 @@ class JsOut
 {
     use Singleton;
 
-    protected $jsRemote;
+    /**
+     * @var string
+     */
+    protected $jsRemote = '';
 
+    /**
+     * @var array<string, string>
+     */
     protected $jsContent = array();
 
+    /**
+     * @var string
+     */
     protected $sig = '';
 
+    /**
+     * @var string
+     */
     protected $fn = '';
 
+    /**
+     * @var bool
+     */
     protected $doConcatenate = true;
 
+    /**
+     * @var bool
+     */
     protected $_includeExt = false;
 
+    /**
+     * @var string
+     */
     protected $storage = '/static/js/gc';
 
+    /**
+     * @var string|null
+     */
     protected $storageAbsPath = null;
 
+    /**
+     * @return string
+     */
     public function readyPlaceholder()
     {
-        $config = \Ufw\Registry::getInstance()->get('application')->getConfig();
+        $config = \Ufw\Registry::getInstance()->getApplication()->getConfig();
         $cfg = $config['jsOutStorage'] ?? null;
         if (!\is_array($cfg) || !isset($cfg['webpath'], $cfg['absrootpath'])) {
             return $this->placeholderScriptsOnlyOutput();
         }
 
-        $this->storage = $cfg['webpath'];
-        $this->storageAbsPath = $cfg['absrootpath'];
+        $this->storage = is_string($cfg['webpath']) ? $cfg['webpath'] : $this->storage;
+        $this->storageAbsPath = is_string($cfg['absrootpath']) ? $cfg['absrootpath'] : null;
         
-        $placeholderHelper = Registry::getInstance()->get('application')->getHelper('placeholder');
-        $this->jsContent['ready'] = (string) $placeholderHelper('jsReady');
-        $this->jsContent['ext'] = (string) $placeholderHelper('jsExt');
-        $this->jsContent['inline'] = (string) $placeholderHelper('jsInline');
-        $this->jsRemote = (string) $placeholderHelper('jsRemote');
+        $this->jsContent['ready'] = $this->fetchPlaceholder('jsReady');
+        $this->jsContent['ext'] = $this->fetchPlaceholder('jsExt');
+        $this->jsContent['inline'] = $this->fetchPlaceholder('jsInline');
+        $this->jsRemote = $this->fetchPlaceholder('jsRemote');
         
         if ($this->_alreadyExists()) {
             unset($this->jsContent['ready'], $this->jsContent['ext']);
@@ -75,6 +101,9 @@ class JsOut
         return ($this->jsRemote ? $this->jsRemote : '') . ($this->jsContent['inline'] ? '<script type="text/javascript">' . $this->jsContent['inline'] . '</script>' : '') . ($this->_includeExt ? '<script' . $bundleScriptType . ' defer src="' . $this->fn . $ext . '"></script>' : '');
     }
 
+    /**
+     * @return bool
+     */
     protected function _alreadyExists()
     {
         $this->sig = md5($this->jsContent['ready'] . '~' . $this->jsContent['ext']);
@@ -82,26 +111,45 @@ class JsOut
         return file_exists($this->storageAbsPath . $this->fn . '.min.js');
     }
 
+    /**
+     * @param bool $val
+     * @return $this
+     */
     protected function _concatenate($val)
     {
         $this->doConcatenate = $val;
         return $this;
     }
 
+    /**
+     * @param string $ext
+     * @return $this
+     */
     protected function _dump($ext)
     {
         if ($this->jsContent['ext']) {
-            file_put_contents($this->storageAbsPath . $this->fn . $ext, $this->jsContent['ext']);
-            chmod($this->storageAbsPath . $this->fn . $ext, 0777);
+            $path = $this->storageAbsPath . $this->fn . $ext;
+            $dir = dirname($path);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0777, true);
+            }
+            file_put_contents($path, $this->jsContent['ext']);
+            chmod($path, 0777);
             $this->_includeExt = true;
         }
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     protected function _gzip()
     {
         if ($this->jsContent['ext']) {
-            $this->jsContent['ext'] = gzencode($this->jsContent['ext']);
+            $encoded = gzencode($this->jsContent['ext']);
+            if ($encoded !== false) {
+                $this->jsContent['ext'] = $encoded;
+            }
         }
         return $this;
     }
@@ -109,13 +157,19 @@ class JsOut
     /**
      * {@link https://packagist.org/packages/tedivm/jshrink JShrink} - required via Composer; pure PHP minify for cached bundles.
      */
+    /**
+     * @return $this
+     */
     protected function _minify()
     {
         foreach ($this->jsContent as $key => $value) {
-            if (!\trim((string) $value)) {
+            if (!\trim($value)) {
                 continue;
             }
-            $this->jsContent[$key] = \JShrink\Minifier::minify(\trim((string) $value));
+            $minified = \JShrink\Minifier::minify(\trim($value));
+            if (is_string($minified)) {
+                $this->jsContent[$key] = $minified;
+            }
         }
         return $this;
     }
@@ -130,6 +184,9 @@ class JsOut
      *    best-effort unwrap for server-assembled fragments; it is not safe if the JS source itself contains those
      *    sequences inside a string literal, or if you embed {@code <script src="…">} (those tags would be stripped).
      */
+    /**
+     * @return $this
+     */
     protected function _sanitize()
     {
         $this->jsContent = preg_replace(array(
@@ -142,7 +199,7 @@ class JsOut
             ';',
         ), $this->jsContent);
         if ($this->doConcatenate) {
-            $wrapped = $this->jsContent['ready'] !== '' && $this->jsContent['ready'] !== null
+            $wrapped = $this->jsContent['ready'] !== ''
                 ? $this->wrapJsReadyFragments((string) $this->jsContent['ready'])
                 : '';
             $this->jsContent['ext'] = $this->jsContent['ext'] . ($wrapped !== '' ? "\n;" . $wrapped : '');
@@ -160,14 +217,17 @@ class JsOut
     protected function getReadyWrapperMode(): string
     {
         try {
-            $config = Registry::getInstance()->get('application')->getConfig();
+            $config = Registry::getInstance()->getApplication()->getConfig();
         } catch (\Throwable $e) {
             return 'module';
         }
         $storage = $config['jsOutStorage'] ?? null;
         $mode = 'module';
         if (is_array($storage) && array_key_exists('readyWrapper', $storage)) {
-            $mode = strtolower(trim((string) $storage['readyWrapper']));
+            $rawMode = $storage['readyWrapper'];
+            if (is_string($rawMode) || is_int($rawMode) || is_float($rawMode)) {
+                $mode = strtolower(trim((string) $rawMode));
+            }
         }
         if ($mode === '') {
             $mode = 'module';
@@ -218,13 +278,15 @@ class JsOut
     /**
      * When jsOutStorage is missing from app config, skip concat/minify file output and emit placeholders only.
      */
+    /**
+     * @return string
+     */
     protected function placeholderScriptsOnlyOutput()
     {
-        $placeholderHelper = Registry::getInstance()->get('application')->getHelper('placeholder');
-        $this->jsContent['ready'] = (string) $placeholderHelper('jsReady');
-        $this->jsContent['ext'] = (string) $placeholderHelper('jsExt');
-        $this->jsContent['inline'] = (string) $placeholderHelper('jsInline');
-        $this->jsRemote = (string) $placeholderHelper('jsRemote');
+        $this->jsContent['ready'] = $this->fetchPlaceholder('jsReady');
+        $this->jsContent['ext'] = $this->fetchPlaceholder('jsExt');
+        $this->jsContent['inline'] = $this->fetchPlaceholder('jsInline');
+        $this->jsRemote = $this->fetchPlaceholder('jsRemote');
 
         $out = $this->jsRemote ? $this->jsRemote : '';
         if ($this->jsContent['inline'] !== '') {
@@ -242,5 +304,29 @@ class JsOut
         }
 
         return $out;
+    }
+
+    /**
+     * @param string $name
+     * @return string
+     */
+    protected function fetchPlaceholder($name)
+    {
+        $helper = Registry::getInstance()->getApplication()->getHelper('placeholder');
+        if (!is_callable($helper)) {
+            return '';
+        }
+        $content = $helper($name);
+        if ($content instanceof Placeholder) {
+            return $content->__toString();
+        }
+        if (is_string($content)) {
+            return $content;
+        }
+        if (is_int($content) || is_float($content) || is_bool($content)) {
+            return (string) $content;
+        }
+
+        return '';
     }
 }

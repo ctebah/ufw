@@ -8,24 +8,19 @@ class Required extends Base
     const REQUIRED = 'required-value';
 
     /**
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageTemplates = array(
         self::REQUIRED => 'Value is required and can\'t be empty'
     );
 
     /**
-     *
-     * @var boolean
+     * @var bool
      */
-    protected $allowMultiple;
+    protected $allowMultiple = false;
 
     /**
-     * Sets validator options
-     *
-     * @param array $options
-     *            Validator options
+     * @param bool $allowMultiple
      */
     public function __construct($allowMultiple = false)
     {
@@ -33,25 +28,29 @@ class Required extends Base
     }
 
     /**
-     *
-     * Returns true if and only if $value is contained in the haystack option.
-     *
      * @param mixed $value
-     * @return boolean
+     * @param array<string, mixed>|null $context
+     * @return bool
      */
     public function isValid($value, $context = null)
     {
-        $result = $this->getAllowMultiple() ? count($value) : strlen($value);
+        if ($this->getAllowMultiple()) {
+            $result = is_array($value) ? count($value) : 0;
+        } elseif (is_scalar($value)) {
+            $result = strlen((string) $value);
+        } else {
+            $result = 0;
+        }
         if (!$result) {
             $this->error(self::REQUIRED);
+            return false;
         }
-        
-        return $result;
+
+        return true;
     }
 
     /**
-     *
-     * @return boolean
+     * @return bool
      */
     public function getAllowMultiple()
     {
@@ -59,12 +58,12 @@ class Required extends Base
     }
 
     /**
-     *
-     * @param boolean $allowMultiple
+     * @param bool $allowMultiple
+     * @return $this
      */
     public function setAllowMultiple($allowMultiple)
     {
-        $this->allowMultiple = $allowMultiple;
+        $this->allowMultiple = (bool) $allowMultiple;
         return $this;
     }
 }

@@ -5,18 +5,12 @@ namespace Ufw\Form\Validator;
 class Identical extends Base
 {
 
-    /**
-     * Error codes
-     * @const string
-     */
     const NOT_SAME = 'notSame';
 
     const MISSING_TOKEN = 'missingToken';
 
     /**
-     * Error messages
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageTemplates = array(
         self::NOT_SAME => "The two given tokens do not match",
@@ -24,18 +18,18 @@ class Identical extends Base
     );
 
     /**
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageVariables = array(
-        'token' => '_tokenString'
+        'token' => 'token'
     );
 
+    /**
+     * @var mixed
+     */
     protected $token;
 
     /**
-     * Sets validator options
-     *
      * @param mixed $token
      */
     public function __construct($token = null)
@@ -44,9 +38,7 @@ class Identical extends Base
     }
 
     /**
-     * Retrieve token
-     *
-     * @return string
+     * @return mixed
      */
     public function getToken()
     {
@@ -54,10 +46,8 @@ class Identical extends Base
     }
 
     /**
-     * Set token against which to compare
-     *
      * @param mixed $token
-     * @return Identical
+     * @return $this
      */
     public function setToken($token)
     {
@@ -66,33 +56,31 @@ class Identical extends Base
     }
 
     /**
-     * Returns true if and only if a token has been set and the provided value
-     * matches that token.
-     *
      * @param mixed $value
-     * @param array $context
-     * @return boolean
+     * @param array<string, mixed>|null $context
+     * @return bool
      */
     public function isValid($value, $context = null)
     {
         $this->setValue($value);
-        
-        if (($context !== null) && isset($context) && array_key_exists($this->getToken(), $context)) {
-            $token = $context[$this->getToken()];
+
+        $tokenKey = $this->getToken();
+        if (is_array($context) && (is_string($tokenKey) || is_int($tokenKey)) && array_key_exists($tokenKey, $context)) {
+            $token = $context[$tokenKey];
         } else {
             $token = $this->getToken();
         }
-        
+
         if ($token === null) {
             $this->error(self::MISSING_TOKEN);
             return false;
         }
-        
+
         if ($value != $token) {
             $this->error(self::NOT_SAME);
             return false;
         }
-        
+
         return true;
     }
 }

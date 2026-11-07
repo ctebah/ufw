@@ -8,13 +8,22 @@ namespace Ufw\Controller;
 abstract class RestApi extends Base
 {
 
+    /**
+     * @return void
+     */
     public function init()
     {
         parent::init();
         $this->getResponse()->setFormat('json');
-        $this->getHelper('render')->setOverwrite(false);
+        $render = $this->getHelper('render');
+        if ($render instanceof \Ufw\Helper\Render) {
+            $render->setOverwrite(false);
+        }
     }
 
+    /**
+     * @return list<class-string>
+     */
     protected function middlewaresPre()
     {
         return [
@@ -22,4 +31,3 @@ abstract class RestApi extends Base
         ];
     }
 }
-    

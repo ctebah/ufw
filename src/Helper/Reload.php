@@ -8,11 +8,17 @@ namespace Ufw\Helper;
 class Reload extends Base
 {
 
+    /**
+     * @return void
+     */
     public function __invoke()
     {
         $this->reload();
     }
 
+    /**
+     * @return void
+     */
     public function reload()
     {
         $this->redirect($this->getRequest()->getRequestTarget());

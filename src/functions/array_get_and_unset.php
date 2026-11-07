@@ -5,7 +5,7 @@ namespace Ufw;
 /**
  * Takes `$array[$key]` (or `$default`), removes that key from `$array`, and returns the value.
  *
- * @param array $array
+ * @param array<int|string, mixed> $array
  * @param string|int $key
  * @param mixed $default
  * @return mixed

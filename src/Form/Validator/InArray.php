@@ -1,32 +1,26 @@
 <?php
 namespace Ufw\Form\Validator;
 
-/** Value must appear in `haystack` (strict comparison optional). */
+/** Value must appear in the element option list ({@see InArray::$haystack}); uses loose comparison like PHP `in_array` without strict. */
 class InArray extends Base
 {
 
     const NOT_IN_ARRAY = 'notInArray';
 
     /**
-     *
-     * @var array
+     * @var array<string, string>
      */
     protected $messageTemplates = array(
         self::NOT_IN_ARRAY => "'%value%' was not found in the list of available options"
     );
 
     /**
-     * Haystack of possible values
-     *
-     * @var array
+     * @var array<int|string, mixed>
      */
     protected $haystack;
 
     /**
-     * Sets validator options
-     *
-     * @param array $options
-     *            Validator options
+     * @param array<int|string, mixed> $haystack
      */
     public function __construct($haystack)
     {
@@ -34,9 +28,7 @@ class InArray extends Base
     }
 
     /**
-     * Returns the haystack option
-     *
-     * @return mixed
+     * @return array<int|string, mixed>
      */
     public function getHaystack()
     {
@@ -44,10 +36,8 @@ class InArray extends Base
     }
 
     /**
-     * Sets the haystack option
-     *
-     * @param mixed $haystack
-     * @return inArray Provides a fluent interface
+     * @param array<int|string, mixed> $haystack
+     * @return $this
      */
     public function setHaystack(array $haystack)
     {
@@ -56,30 +46,37 @@ class InArray extends Base
     }
 
     /**
-     *
-     * Returns true if and only if $value is contained in the haystack option.
-     *
      * @param mixed $value
-     * @return boolean
+     * @param array<string, mixed>|null $context
+     * @return bool
      */
     public function isValid($value, $context = null)
     {
-        if (is_null($value)) {
+        $element = $this->getElement();
+        if ($element instanceof \Ufw\Form\Element\Multi) {
+            $this->setHaystack($element->getMultiOptionValues());
+        }
+
+        if ($value === null) {
             return true;
         }
-        
+
         $this->setValue($value);
-        
+
         if (is_scalar($value)) {
             if (in_array($value, $this->haystack)) {
                 return true;
             }
-        } else {
-            if (!array_diff($value, $this->haystack)) {
-                return true;
+        } elseif (is_array($value)) {
+            foreach ($value as $item) {
+                if (!in_array($item, $this->haystack)) {
+                    $this->error(self::NOT_IN_ARRAY);
+                    return false;
+                }
             }
+            return true;
         }
-        
+
         $this->error(self::NOT_IN_ARRAY);
         return false;
     }

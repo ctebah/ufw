@@ -8,22 +8,26 @@ namespace Ufw\Exception;
 class BreakExecution extends \Exception
 {
 
+    /**
+     * @param string|null $message
+     * @param int|null $code
+     * @param \Throwable|null $previous
+     */
     public function __construct($message = null, $code = null, $previous = null)
     {
         parent::__construct((string) ($message ?? ''), (int) ($code ?? 0), $previous);
         if ($code) {
             $this->getApplication()
                 ->getResponse()
-                ->withStatus($code, $message);
+                ->withStatus((int) $code, (string) ($message ?? ''));
         }
     }
 
     /**
-     *
      * @return \Ufw\Application
      */
     protected function getApplication()
     {
-        return \Ufw\Registry::getInstance()->get('application');
+        return \Ufw\Registry::getInstance()->getApplication();
     }
 }

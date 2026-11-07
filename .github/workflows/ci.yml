@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main, feat/db-layer]
+  pull_request:
+    branches: [master, main, feat/db-layer]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phpstan:
+    name: PHPStan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: PHPStan (level 10, src/)
+        run: composer phpstan
+
+  tests:
+    name: PHPUnit + coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run full suite in Docker (MySQL + PCOV)
+        run: |
+          docker/phpunit.sh vendor/bin/phpunit -c phpunit.xml.dist \
+            --coverage-clover coverage/clover.xml
+
+      - name: Enforce coverage floor (≥98% lines & methods on src/)
+        run: php bin/coverage-check.php
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/clover.xml
+          fail_ci_if_error: true

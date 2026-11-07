@@ -18,7 +18,8 @@ class Csrf
 
     public static function getDefaultFieldName(): string
     {
-        return static::DEFAULT_FIELD_NAME;
+        $name = static::DEFAULT_FIELD_NAME;
+        return is_string($name) ? $name : self::DEFAULT_FIELD_NAME;
     }
 
     /**
@@ -29,7 +30,7 @@ class Csrf
         if (session_status() === \PHP_SESSION_NONE) {
             session_start();
         }
-        $key = static::SESSION_PREFIX . $purpose;
+        $key = self::sessionKey($purpose);
         if (empty($_SESSION[$key]) || !is_string($_SESSION[$key])) {
             $_SESSION[$key] = bin2hex(random_bytes(32));
         }
@@ -39,13 +40,15 @@ class Csrf
 
     /**
      * Whether the submitted value matches the session token for this purpose.
+     *
+     * @param mixed $submitted
      */
     public static function validate(string $purpose, $submitted): bool
     {
         if (session_status() === \PHP_SESSION_NONE) {
             session_start();
         }
-        $key = static::SESSION_PREFIX . $purpose;
+        $key = self::sessionKey($purpose);
         if (!isset($_SESSION[$key]) || !is_string($_SESSION[$key])) {
             return false;
         }
@@ -64,6 +67,16 @@ class Csrf
         if (session_status() === \PHP_SESSION_NONE) {
             session_start();
         }
-        $_SESSION[static::SESSION_PREFIX . $purpose] = bin2hex(random_bytes(32));
+        $_SESSION[self::sessionKey($purpose)] = bin2hex(random_bytes(32));
+    }
+
+    protected static function sessionKey(string $purpose): string
+    {
+        $prefix = static::SESSION_PREFIX;
+        if (!is_string($prefix)) {
+            $prefix = self::SESSION_PREFIX;
+        }
+
+        return $prefix . $purpose;
     }
 }
